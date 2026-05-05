@@ -1,0 +1,231 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { UserPlus, Download, Pencil, Search } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
+interface StudentRow {
+  id: string;
+  nisn: string;
+  fullname: string;
+  class: string;
+  is_active: boolean;
+  has_face: boolean;
+}
+
+const AVATAR_COLORS = [
+  '#264778', '#007169', '#5b4300', '#93000a', '#405f91',
+  '#00504a', '#3a2900', '#002b5b', '#00201d', '#201600',
+];
+
+function avatarColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function initials(name: string) {
+  return name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+}
+
+function StatusBadge({ isActive, hasFace }: { isActive: boolean; hasFace: boolean }) {
+  if (!hasFace) return (
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#d6e3ff', color: '#264778' }}>Pending Setup</span>
+  );
+  if (isActive) return (
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>Active</span>
+  );
+  return (
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#ffdad6', color: '#ba1a1a' }}>Inactive</span>
+  );
+}
+
+const PAGE_SIZE = 10;
+
+export default function StudentsPage() {
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [classFilter, setClassFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [classes, setClasses] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.from('students').select('class').then(({ data }) => {
+      if (data) {
+        const unique = [...new Set(data.map((d: { class: string }) => d.class))].sort();
+        setClasses(unique);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from('users')
+        .select('id, nisn, fullname, is_active, students(class), face_embeddings(id)', { count: 'exact' })
+        .eq('role', 'siswa')
+        .order('fullname')
+        .range(from, to);
+
+      if (search) query = query.ilike('fullname', `%${search}%`);
+      if (classFilter) query = query.eq('students.class', classFilter);
+      if (statusFilter === 'active') query = query.eq('is_active', true);
+      if (statusFilter === 'inactive') query = query.eq('is_active', false);
+
+      const { data, count } = await query;
+      setTotal(count ?? 0);
+
+      if (data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setStudents(data.map((u: any) => ({
+          id: u.id,
+          nisn: u.nisn,
+          fullname: u.fullname,
+          is_active: u.is_active,
+          class: u.students?.class ?? '—',
+          has_face: Array.isArray(u.face_embeddings) ? u.face_embeddings.length > 0 : !!u.face_embeddings,
+        })));
+      }
+      setLoading(false);
+    }
+    load();
+  }, [page, search, classFilter, statusFilter]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  return (
+    <div>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: '#191c1e' }}>Student Data Management</h1>
+          <p className="text-sm mt-1" style={{ color: '#43474f' }}>Manage enrollments, NISN records, and account statuses.</p>
+        </div>
+        <div className="flex gap-2">
+          <button className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-[#f7f9fb]" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
+            <Download size={15} /> Export
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors hover:opacity-90" style={{ backgroundColor: '#001736' }}>
+            <UserPlus size={15} /> Add Student
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#747780' }} />
+          <input
+            type="text"
+            placeholder="Search students..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="pl-9 pr-4 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-[#264778]"
+            style={{ borderColor: '#e0e3e5', width: 220 }}
+          />
+        </div>
+        <select
+          value={classFilter}
+          onChange={(e) => { setClassFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 text-sm rounded-lg border outline-none"
+          style={{ borderColor: '#e0e3e5', color: '#43474f' }}
+        >
+          <option value="">All Classes</option>
+          {classes.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 text-sm rounded-lg border outline-none"
+          style={{ borderColor: '#e0e3e5', color: '#43474f' }}
+        >
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <p className="ml-auto text-xs" style={{ color: '#747780' }}>
+          Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString()} students
+        </p>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ backgroundColor: '#f7f9fb' }}>
+              {['Name', 'NISN', 'Class', 'Account Status', 'Actions'].map((h) => (
+                <th key={h} className="px-5 py-3 text-left text-xs font-semibold" style={{ color: '#43474f' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
+            ) : students.length === 0 ? (
+              <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Tidak ada siswa ditemukan</td></tr>
+            ) : students.map((s) => (
+              <tr key={s.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
+                <td className="px-5 py-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      style={{ backgroundColor: avatarColor(s.fullname) }}
+                    >
+                      {initials(s.fullname)}
+                    </div>
+                    <span className="font-medium" style={{ color: '#191c1e' }}>{s.fullname}</span>
+                  </div>
+                </td>
+                <td className="px-5 py-3" style={{ color: '#43474f' }}>{s.nisn}</td>
+                <td className="px-5 py-3" style={{ color: '#43474f' }}>{s.class}</td>
+                <td className="px-5 py-3"><StatusBadge isActive={s.is_active} hasFace={s.has_face} /></td>
+                <td className="px-5 py-3">
+                  <button className="p-1.5 rounded-lg hover:bg-[#f2f4f6] transition-colors" style={{ color: '#43474f' }}>
+                    <Pencil size={15} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1 mt-4">
+          <PaginBtn label="‹" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} />
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            const p = page <= 3 ? i + 1 : page - 2 + i;
+            if (p < 1 || p > totalPages) return null;
+            return <PaginBtn key={p} label={String(p)} onClick={() => setPage(p)} active={p === page} />;
+          })}
+          {totalPages > 5 && page < totalPages - 2 && <span className="px-2 text-sm" style={{ color: '#747780' }}>...</span>}
+          {totalPages > 5 && page < totalPages - 2 && <PaginBtn label={String(totalPages)} onClick={() => setPage(totalPages)} />}
+          <PaginBtn label="›" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaginBtn({ label, onClick, active, disabled }: { label: string; onClick: () => void; active?: boolean; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-8 h-8 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
+      style={{
+        backgroundColor: active ? '#001736' : 'transparent',
+        color: active ? '#ffffff' : '#43474f',
+      }}
+    >
+      {label}
+    </button>
+  );
+}

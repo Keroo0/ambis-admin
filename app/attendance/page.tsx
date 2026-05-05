@@ -1,0 +1,173 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { CheckCircle, AlertTriangle, Clock, Check, X } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
+interface LeaveRequest {
+  id: string;
+  student_id: string;
+  type: string;
+  reason: string | null;
+  attachment_url: string | null;
+  status: string;
+  date_from: string | null;
+  date_to: string | null;
+  created_at: number;
+  student?: { fullname: string; class: string } | null;
+}
+
+export default function AttendancePage() {
+  const [pending, setPending] = useState<LeaveRequest[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [approvedToday, setApprovedToday] = useState(0);
+  const [attentionNeeded, setAttentionNeeded] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const today = new Date().toISOString().split('T')[0];
+
+      const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
+        supabase
+          .from('leave_requests')
+          .select('id, student_id, type, reason, attachment_url, status, date_from, date_to, created_at, students(fullname, class)')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false }),
+        supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'approved').gte('date_from', today),
+        supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'rejected'),
+      ]);
+
+      if (pendingRes.data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows = pendingRes.data.map((r: any) => ({
+          id: r.id, student_id: r.student_id, type: r.type, reason: r.reason,
+          attachment_url: r.attachment_url, status: r.status, date_from: r.date_from,
+          date_to: r.date_to, created_at: r.created_at, student: r.students,
+        }));
+        setPending(rows);
+        setPendingCount(rows.length);
+      }
+      setApprovedToday(approvedRes.count ?? 0);
+      setAttentionNeeded(rejectedRes.count ?? 0);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  async function handleApprove(id: string) {
+    await supabase.from('leave_requests').update({ status: 'approved' }).eq('id', id);
+    setPending((prev) => prev.filter((r) => r.id !== id));
+    setPendingCount((c) => c - 1);
+    setApprovedToday((c) => c + 1);
+  }
+
+  async function handleReject(id: string) {
+    await supabase.from('leave_requests').update({ status: 'rejected' }).eq('id', id);
+    setPending((prev) => prev.filter((r) => r.id !== id));
+    setPendingCount((c) => c - 1);
+    setAttentionNeeded((c) => c + 1);
+  }
+
+  const typeLabel = (type: string) => type === 'sakit'
+    ? { label: 'Sakit', bg: '#ffdf9e', color: '#5b4300' }
+    : { label: 'Izin', bg: '#d8f5f3', color: '#00504a' };
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold" style={{ color: '#191c1e' }}>Attendance Approvals</h1>
+        <p className="text-sm mt-1" style={{ color: '#43474f' }}>Review pending sick leave and permission requests.</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <StatCard label="PENDING APPROVALS" value={pendingCount} icon={<Clock size={18} />} iconBg="#ffdf9e" iconColor="#5b4300" />
+        <StatCard label="APPROVED TODAY" value={approvedToday} icon={<CheckCircle size={18} />} iconBg="#d8f5f3" iconColor="#007169" />
+        <StatCard label="ATTENTION NEEDED" value={attentionNeeded} icon={<AlertTriangle size={18} />} iconBg="#ffdad6" iconColor="#ba1a1a" />
+      </div>
+
+      {/* Cards */}
+      {loading ? (
+        <p className="text-sm" style={{ color: '#747780' }}>Memuat data...</p>
+      ) : pending.length === 0 ? (
+        <div className="bg-white rounded-xl border border-[#e0e3e5] p-12 text-center">
+          <CheckCircle size={40} className="mx-auto mb-3" style={{ color: '#007169' }} />
+          <p className="font-medium" style={{ color: '#191c1e' }}>Tidak ada pengajuan yang menunggu persetujuan</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+          {pending.map((req) => {
+            const t = typeLabel(req.type);
+            return (
+              <div key={req.id} className="bg-white rounded-xl border border-[#e0e3e5] p-5">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: '#191c1e' }}>{req.student?.fullname ?? req.student_id}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#747780' }}>
+                      {req.student?.class} • {req.date_from}{req.date_to && req.date_to !== req.date_from ? ` – ${req.date_to}` : ''}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: t.bg, color: t.color }}>{t.label}</span>
+                </div>
+
+                {req.reason && (
+                  <p className="text-xs italic my-3 p-3 rounded-lg" style={{ backgroundColor: '#f7f9fb', color: '#43474f' }}>
+                    &ldquo;{req.reason}&rdquo;
+                  </p>
+                )}
+
+                {req.attachment_url && (
+                  <div className="mb-3">
+                    <p className="text-xs font-medium mb-1.5" style={{ color: '#43474f' }}>Attachment</p>
+                    <a
+                      href={req.attachment_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 text-xs p-2.5 rounded-lg border border-[#e0e3e5] hover:bg-[#f7f9fb]"
+                      style={{ color: '#405f91' }}
+                    >
+                      <span>📎</span>
+                      <span>Lihat lampiran</span>
+                    </a>
+                  </div>
+                )}
+
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => handleApprove(req.id)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-white transition-colors hover:opacity-90"
+                    style={{ backgroundColor: '#001736' }}
+                  >
+                    <Check size={15} /> Approve
+                  </button>
+                  <button
+                    onClick={() => handleReject(req.id)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-[#f7f9fb]"
+                    style={{ borderColor: '#e0e3e5', color: '#43474f' }}
+                  >
+                    <X size={15} /> Reject
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, icon, iconBg, iconColor }: {
+  label: string; value: number; icon: React.ReactNode; iconBg: string; iconColor: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-[#e0e3e5] p-5">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#43474f' }}>{label}</p>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: iconBg, color: iconColor }}>{icon}</div>
+      </div>
+      <p className="text-3xl font-bold" style={{ color: '#191c1e' }}>{value}</p>
+    </div>
+  );
+}

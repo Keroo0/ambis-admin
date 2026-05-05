@@ -1,0 +1,85 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  CalendarCheck,
+  HelpCircle,
+  LogOut,
+} from 'lucide-react';
+
+const navItems = [
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/students', label: 'Student Data', icon: Users },
+  { href: '/grades', label: 'Grade Input', icon: BookOpen },
+  { href: '/attendance', label: 'Attendance', icon: CalendarCheck },
+];
+
+export default function Sidebar() {
+  const pathname = usePathname();
+
+  return (
+    <aside
+      style={{ backgroundColor: '#001736', width: 240, minHeight: '100vh' }}
+      className="flex flex-col fixed left-0 top-0 bottom-0 z-30"
+    >
+      {/* Logo */}
+      <div className="px-5 pt-6 pb-4">
+        <div className="flex items-center gap-3">
+          <div
+            style={{ backgroundColor: '#264778' }}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+          >
+            A
+          </div>
+          <div>
+            <p className="text-white font-bold text-sm leading-tight">SMAN 07</p>
+            <p style={{ color: '#7594ca' }} className="text-xs leading-tight">Kab. Tangerang</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-2">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              style={{
+                backgroundColor: active ? '#264778' : 'transparent',
+                color: active ? '#a9c7ff' : '#c4c6d0',
+              }}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-colors hover:bg-[#002b5b]"
+            >
+              <Icon size={18} />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Bottom */}
+      <div className="px-3 pb-6 border-t border-[#264778] pt-4 mt-2">
+        <button
+          style={{ color: '#c4c6d0' }}
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm hover:bg-[#002b5b] transition-colors"
+        >
+          <HelpCircle size={18} />
+          Help Center
+        </button>
+        <button
+          style={{ color: '#ff8a80' }}
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm hover:bg-[#002b5b] transition-colors"
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
+      </div>
+    </aside>
+  );
+}
