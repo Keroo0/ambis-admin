@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { UserPlus, Download, Pencil, Search } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { UserPlus, Download, Pencil, Search, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import StudentModal from '@/components/students/StudentModal';
+import ResetFaceDialog from '@/components/students/ResetFaceDialog';
 
 interface StudentRow {
   id: string;
@@ -52,6 +54,13 @@ export default function StudentsPage() {
   const [classes, setClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [selectedStudent, setSelectedStudent] = useState<StudentRow | undefined>();
+
+  const [showReset, setShowReset] = useState(false);
+  const [resetTarget, setResetTarget] = useState<{ id: string; name: string } | null>(null);
+
   useEffect(() => {
     supabase.from('students').select('class').then(({ data }) => {
       if (data) {
@@ -61,44 +70,60 @@ export default function StudentsPage() {
     });
   }, []);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const from = (page - 1) * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
+  const load = useCallback(async () => {
+    setLoading(true);
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
-      let query = supabase
-        .from('users')
-        .select('id, nisn, fullname, is_active, students(class), face_embeddings(id)', { count: 'exact' })
-        .eq('role', 'siswa')
-        .order('fullname')
-        .range(from, to);
+    let query = supabase
+      .from('users')
+      .select('id, nisn, fullname, is_active, students(class), face_embeddings(id)', { count: 'exact' })
+      .eq('role', 'siswa')
+      .order('fullname')
+      .range(from, to);
 
-      if (search) query = query.ilike('fullname', `%${search}%`);
-      if (classFilter) query = query.eq('students.class', classFilter);
-      if (statusFilter === 'active') query = query.eq('is_active', true);
-      if (statusFilter === 'inactive') query = query.eq('is_active', false);
+    if (search) query = query.ilike('fullname', `%${search}%`);
+    if (classFilter) query = query.eq('students.class', classFilter);
+    if (statusFilter === 'active') query = query.eq('is_active', true);
+    if (statusFilter === 'inactive') query = query.eq('is_active', false);
 
-      const { data, count } = await query;
-      setTotal(count ?? 0);
+    const { data, count } = await query;
+    setTotal(count ?? 0);
 
-      if (data) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setStudents(data.map((u: any) => ({
-          id: u.id,
-          nisn: u.nisn,
-          fullname: u.fullname,
-          is_active: u.is_active,
-          class: u.students?.class ?? '—',
-          has_face: Array.isArray(u.face_embeddings) ? u.face_embeddings.length > 0 : !!u.face_embeddings,
-        })));
-      }
-      setLoading(false);
+    if (data) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setStudents(data.map((u: any) => ({
+        id: u.id,
+        nisn: u.nisn,
+        fullname: u.fullname,
+        is_active: u.is_active,
+        class: u.students?.class ?? '—',
+        has_face: Array.isArray(u.face_embeddings) ? u.face_embeddings.length > 0 : !!u.face_embeddings,
+      })));
     }
-    load();
+    setLoading(false);
   }, [page, search, classFilter, statusFilter]);
 
+  useEffect(() => { load(); }, [load]);
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  function openAdd() {
+    setModalMode('add');
+    setSelectedStudent(undefined);
+    setShowModal(true);
+  }
+
+  function openEdit(s: StudentRow) {
+    setModalMode('edit');
+    setSelectedStudent(s);
+    setShowModal(true);
+  }
+
+  function openReset(s: StudentRow) {
+    setResetTarget({ id: s.id, name: s.fullname });
+    setShowReset(true);
+  }
 
   return (
     <div>
@@ -111,13 +136,16 @@ export default function StudentsPage() {
           <button className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-[#f7f9fb]" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
             <Download size={15} /> Export
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors hover:opacity-90" style={{ backgroundColor: '#001736' }}>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors hover:opacity-90"
+            style={{ backgroundColor: '#001736' }}
+          >
             <UserPlus size={15} /> Add Student
           </button>
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3 mb-4">
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#747780' }} />
@@ -130,21 +158,13 @@ export default function StudentsPage() {
             style={{ borderColor: '#e0e3e5', width: 220 }}
           />
         </div>
-        <select
-          value={classFilter}
-          onChange={(e) => { setClassFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 text-sm rounded-lg border outline-none"
-          style={{ borderColor: '#e0e3e5', color: '#43474f' }}
-        >
+        <select value={classFilter} onChange={(e) => { setClassFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 text-sm rounded-lg border outline-none" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
           <option value="">All Classes</option>
           {classes.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 text-sm rounded-lg border outline-none"
-          style={{ borderColor: '#e0e3e5', color: '#43474f' }}
-        >
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 text-sm rounded-lg border outline-none" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
           <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
@@ -154,7 +174,6 @@ export default function StudentsPage() {
         </p>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -173,10 +192,8 @@ export default function StudentsPage() {
               <tr key={s.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                      style={{ backgroundColor: avatarColor(s.fullname) }}
-                    >
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      style={{ backgroundColor: avatarColor(s.fullname) }}>
                       {initials(s.fullname)}
                     </div>
                     <span className="font-medium" style={{ color: '#191c1e' }}>{s.fullname}</span>
@@ -186,9 +203,16 @@ export default function StudentsPage() {
                 <td className="px-5 py-3" style={{ color: '#43474f' }}>{s.class}</td>
                 <td className="px-5 py-3"><StatusBadge isActive={s.is_active} hasFace={s.has_face} /></td>
                 <td className="px-5 py-3">
-                  <button className="p-1.5 rounded-lg hover:bg-[#f2f4f6] transition-colors" style={{ color: '#43474f' }}>
-                    <Pencil size={15} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => openEdit(s)} title="Edit siswa"
+                      className="p-1.5 rounded-lg hover:bg-[#f2f4f6] transition-colors" style={{ color: '#43474f' }}>
+                      <Pencil size={15} />
+                    </button>
+                    <button onClick={() => openReset(s)} title="Reset data wajah"
+                      className="p-1.5 rounded-lg hover:bg-[#ffdad6] transition-colors" style={{ color: '#ba1a1a' }}>
+                      <RefreshCw size={15} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -196,7 +220,6 @@ export default function StudentsPage() {
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-1 mt-4">
           <PaginBtn label="‹" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} />
@@ -210,21 +233,32 @@ export default function StudentsPage() {
           <PaginBtn label="›" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} />
         </div>
       )}
+
+      {showModal && (
+        <StudentModal
+          mode={modalMode}
+          student={selectedStudent}
+          onClose={() => setShowModal(false)}
+          onSuccess={load}
+        />
+      )}
+      {showReset && resetTarget && (
+        <ResetFaceDialog
+          studentId={resetTarget.id}
+          studentName={resetTarget.name}
+          onClose={() => { setShowReset(false); setResetTarget(null); }}
+          onSuccess={load}
+        />
+      )}
     </div>
   );
 }
 
 function PaginBtn({ label, onClick, active, disabled }: { label: string; onClick: () => void; active?: boolean; disabled?: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
+    <button onClick={onClick} disabled={disabled}
       className="w-8 h-8 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
-      style={{
-        backgroundColor: active ? '#001736' : 'transparent',
-        color: active ? '#ffffff' : '#43474f',
-      }}
-    >
+      style={{ backgroundColor: active ? '#001736' : 'transparent', color: active ? '#ffffff' : '#43474f' }}>
       {label}
     </button>
   );

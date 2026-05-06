@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Users, CalendarCheck, AlertCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import GeofenceSection from '@/components/dashboard/GeofenceSection';
 
 interface AbsenceRow {
   id: string;
@@ -123,6 +124,8 @@ export default function DashboardPage() {
           </tbody>
         </table>
       </div>
+
+      <GeofenceSection />
     </div>
   );
 }

@@ -40,3 +40,10 @@ export interface AttendanceSummary {
   time_in: string | null;
   student?: { fullname: string; class: string };
 }
+
+export interface GeofenceSettings {
+  enabled: boolean;
+  lat: string;
+  lng: string;
+  radius: string;
+}
