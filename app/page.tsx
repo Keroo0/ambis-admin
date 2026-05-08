@@ -30,7 +30,7 @@ export default function DashboardPage() {
         supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase
           .from('attendance')
-          .select('id, student_id, date, status, notes, students(fullname, class)')
+          .select('id, student_id, date, status, notes, students!attendance_student_id_fkey(class, users!students_id_fkey(fullname))')
           .eq('date', today)
           .neq('status', 'present')
           .limit(10),
@@ -47,7 +47,9 @@ export default function DashboardPage() {
           date: r.date,
           status: r.status,
           notes: r.notes,
-          student: r.students,
+          student: r.students
+            ? { fullname: r.students.users?.fullname ?? null, class: r.students.class ?? null }
+            : null,
         })));
       }
 

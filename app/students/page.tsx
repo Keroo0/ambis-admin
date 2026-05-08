@@ -77,7 +77,7 @@ export default function StudentsPage() {
 
     let query = supabase
       .from('users')
-      .select('id, nisn, fullname, is_active, students(class), face_embeddings(id)', { count: 'exact' })
+      .select('id, nisn, fullname, is_active, students!students_id_fkey(class, face_embeddings!face_embeddings_student_id_fkey(id))', { count: 'exact' })
       .eq('role', 'siswa')
       .order('fullname')
       .range(from, to);
@@ -98,7 +98,7 @@ export default function StudentsPage() {
         fullname: u.fullname,
         is_active: u.is_active,
         class: u.students?.class ?? '—',
-        has_face: Array.isArray(u.face_embeddings) ? u.face_embeddings.length > 0 : !!u.face_embeddings,
+        has_face: Array.isArray(u.students?.face_embeddings) ? u.students.face_embeddings.length > 0 : !!u.students?.face_embeddings,
       })));
     }
     setLoading(false);

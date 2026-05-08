@@ -39,7 +39,7 @@ export default function AttendancePage() {
       supabase
         .from('leave_requests')
         .select(
-          'id, student_id, type, reason, attachment_url, status, date_from, date_to, created_at, students!student_id(class, users!id(fullname))'
+          'id, student_id, type, reason, attachment_url, status, date_from, date_to, created_at, students!leave_requests_student_id_fkey(class, users!students_id_fkey(fullname))'
         )
         .eq('status', 'pending')
         .order('created_at', { ascending: false }),

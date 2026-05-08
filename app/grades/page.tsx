@@ -75,7 +75,7 @@ export default function GradesPage() {
     // Fetch students in this class via students table join
     const { data: stuData, count } = await supabase
       .from('students')
-      .select('id, nisn, class, users!id(fullname)', { count: 'exact' })
+      .select('id, nisn, class, users!students_id_fkey(fullname)', { count: 'exact' })
       .eq('class', selectedClass)
       .order('nisn')
       .range(from, to);
