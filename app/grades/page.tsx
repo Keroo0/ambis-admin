@@ -172,6 +172,18 @@ export default function GradesPage() {
 
     if (upserts.length > 0) {
       await supabase.from('grades').upsert(upserts, { onConflict: 'id' });
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const auditRows = upserts.map((u: any) => ({
+          action: 'update_grade',
+          entity_type: 'grade',
+          entity_id: u.id,
+          old_value: null,
+          new_value: JSON.stringify({ student_id: u.student_id, subject: u.subject, type: u.type, score: u.score }),
+          created_at: Date.now(),
+        }));
+        await supabase.from('audit_log').insert(auditRows);
+      } catch (_) { /* non-blocking */ }
     }
     await loadStudentsAndGrades();
     setSaving(false);

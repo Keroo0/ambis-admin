@@ -1,25 +1,37 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
   BookOpen,
   CalendarCheck,
+  ClipboardList,
+  FlaskConical,
   HelpCircle,
   LogOut,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/students', label: 'Student Data', icon: Users },
   { href: '/grades', label: 'Grade Input', icon: BookOpen },
   { href: '/attendance', label: 'Attendance', icon: CalendarCheck },
+  { href: '/audit', label: 'Audit Log', icon: ClipboardList },
+  { href: '/demo', label: 'Demo Data', icon: FlaskConical },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  }
 
   return (
     <aside
@@ -73,6 +85,7 @@ export default function Sidebar() {
           Help Center
         </button>
         <button
+          onClick={handleLogout}
           style={{ color: '#ff8a80' }}
           className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm hover:bg-[#002b5b] transition-colors"
         >

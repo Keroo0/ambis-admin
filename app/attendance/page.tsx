@@ -80,6 +80,7 @@ export default function AttendancePage() {
 
   async function handleApprove(id: string) {
     setActionLoading(id);
+    const req = pending.find((r) => r.id === id);
     await supabase
       .from('leave_requests')
       .update({ status: 'approved', reviewed_at: Date.now() })
@@ -88,10 +89,21 @@ export default function AttendancePage() {
     setPendingCount((c) => c - 1);
     setApprovedToday((c) => c + 1);
     setActionLoading(null);
+    try {
+      await supabase.from('audit_log').insert({
+        action: 'approve_leave',
+        entity_type: 'leave',
+        entity_id: id,
+        old_value: JSON.stringify({ status: 'pending' }),
+        new_value: JSON.stringify({ status: 'approved', student_id: req?.student_id }),
+        created_at: Date.now(),
+      });
+    } catch (_) { /* non-blocking */ }
   }
 
   async function handleReject(id: string, reason: string) {
     setActionLoading(id);
+    const req = pending.find((r) => r.id === id);
     await supabase
       .from('leave_requests')
       .update({
@@ -106,6 +118,16 @@ export default function AttendancePage() {
     setRejectModal(null);
     setRejectReason('');
     setActionLoading(null);
+    try {
+      await supabase.from('audit_log').insert({
+        action: 'reject_leave',
+        entity_type: 'leave',
+        entity_id: id,
+        old_value: JSON.stringify({ status: 'pending' }),
+        new_value: JSON.stringify({ status: 'rejected', rejected_reason: reason.trim() || null, student_id: req?.student_id }),
+        created_at: Date.now(),
+      });
+    } catch (_) { /* non-blocking */ }
   }
 
   const typeLabel = (type: string) =>
