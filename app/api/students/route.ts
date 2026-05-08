@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -51,6 +52,8 @@ export async function POST(req: NextRequest) {
 
   const userId = authData.user.id;
 
+  const passwordHash = createHash('sha256').update(password).digest('hex');
+
   const { error: userError } = await supabaseAdmin.from('users').insert({
     id: userId,
     nisn: nisn.trim(),
@@ -58,6 +61,7 @@ export async function POST(req: NextRequest) {
     email,
     role: 'siswa',
     is_active: true,
+    password_hash: passwordHash,
   });
 
   if (userError) {
