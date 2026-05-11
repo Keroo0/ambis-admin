@@ -64,13 +64,16 @@ export default function GeofenceSection() {
       { key: 'geofence_radius',  value: radius,          type: 'int',    updated_at: now },
     ];
 
-    const { error } = await supabase
-      .from('settings')
-      .upsert(rows, { onConflict: 'key' });
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rows),
+    });
+    const json = await res.json();
 
     setSaving(false);
-    if (error) {
-      setSavedMsg(`Error: ${error.message}`);
+    if (!res.ok) {
+      setSavedMsg(`Error: ${json.error ?? res.statusText}`);
     } else {
       setSavedMsg('Pengaturan disimpan!');
       setTimeout(() => setSavedMsg(''), 3000);
