@@ -49,6 +49,12 @@ export default function GradesPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [adminId, setAdminId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
+  }, []);
 
   // Load available classes from students table
   useEffect(() => {
@@ -116,7 +122,7 @@ export default function GradesPage() {
       });
       rows.forEach((s) => {
         const e = map[s.id];
-        if (e.uts && e.uas) e.status = 'saved';
+        if (e.uts || e.uas) e.status = 'saved';
       });
     }
     setGrades(map);
@@ -136,6 +142,7 @@ export default function GradesPage() {
   async function saveAll() {
     setSaving(true);
     setSaveSuccess(false);
+    setSaveError('');
     const year = parseInt(academicYear.split('/')[0]);
     const now = Date.now();
     const upserts: object[] = [];
@@ -171,15 +178,21 @@ export default function GradesPage() {
     });
 
     if (upserts.length > 0) {
-      await supabase.from('grades').upsert(upserts, { onConflict: 'id' });
+      const { error: upsertErr } = await supabase.from('grades').upsert(upserts, { onConflict: 'id' });
+      if (upsertErr) {
+        setSaveError(`Gagal menyimpan: ${upsertErr.message}`);
+        setSaving(false);
+        return;
+      }
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const auditRows = upserts.map((u: any) => ({
+          admin_id: adminId,
           action: 'update_grade',
           entity_type: 'grade',
           entity_id: u.id,
           old_value: null,
-          new_value: JSON.stringify({ student_id: u.student_id, subject: u.subject, type: u.type, score: u.score }),
+          new_value: { student_id: u.student_id, subject: u.subject, type: u.type, score: u.score },
           created_at: Date.now(),
         }));
         await supabase.from('audit_log').insert(auditRows);
@@ -207,6 +220,11 @@ export default function GradesPage() {
           {saveSuccess && (
             <span className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>
               ✓ Nilai tersimpan
+            </span>
+          )}
+          {saveError && (
+            <span className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#ffdad6', color: '#ba1a1a' }}>
+              {saveError}
             </span>
           )}
           <button

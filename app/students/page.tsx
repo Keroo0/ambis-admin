@@ -53,6 +53,7 @@ export default function StudentsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [classes, setClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
@@ -71,6 +72,7 @@ export default function StudentsPage() {
   }, []);
 
   const load = useCallback(async () => {
+    setLoadError('');
     setLoading(true);
     const from = (page - 1) * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
@@ -87,7 +89,14 @@ export default function StudentsPage() {
     if (statusFilter === 'active') query = query.eq('is_active', true);
     if (statusFilter === 'inactive') query = query.eq('is_active', false);
 
-    const { data, count } = await query;
+    const { data, count, error: queryErr } = await query;
+    if (queryErr) {
+      setStudents([]);
+      setTotal(0);
+      setLoadError('Gagal memuat data siswa.');
+      setLoading(false);
+      return;
+    }
     setTotal(count ?? 0);
 
     if (data) {
@@ -186,6 +195,8 @@ export default function StudentsPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
+            ) : loadError ? (
+              <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: '#ba1a1a' }}>{loadError}</td></tr>
             ) : students.length === 0 ? (
               <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Tidak ada siswa ditemukan</td></tr>
             ) : students.map((s) => (

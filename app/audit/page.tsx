@@ -9,8 +9,8 @@ interface AuditRow {
   action: string;
   entity_type: string;
   entity_id: string;
-  old_value: string | null;
-  new_value: string | null;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
   created_at: number;
 }
 
@@ -45,17 +45,12 @@ function formatTs(ts: number) {
   });
 }
 
-function previewValue(raw: string | null) {
+function previewValue(raw: Record<string, unknown> | null) {
   if (!raw) return '—';
-  try {
-    const obj = JSON.parse(raw) as Record<string, unknown>;
-    return Object.entries(obj)
-      .slice(0, 3)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(', ');
-  } catch {
-    return raw.slice(0, 80);
-  }
+  return Object.entries(raw)
+    .slice(0, 3)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(', ');
 }
 
 export default function AuditPage() {
@@ -64,11 +59,16 @@ export default function AuditPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error: queryErr } = await supabase
       .from('audit_log')
       .select('id, action, entity_type, entity_id, old_value, new_value, created_at')
       .order('created_at', { ascending: false })
       .limit(100);
+    if (queryErr) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     setRows((data as AuditRow[]) ?? []);
     setLoading(false);
   }

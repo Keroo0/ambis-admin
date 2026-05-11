@@ -54,24 +54,28 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
     setLoading(true);
 
     if (mode === 'add') {
-      const res = await fetch('/api/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nisn: nisn.trim(),
-          fullname: fullname.trim(),
-          class: studentClass,
-          password,
-        }),
-      });
-      const data = await res.json();
-      if (res.status === 409) {
-        setNisnError('NISN sudah terdaftar');
-      } else if (!res.ok) {
-        setError(data.error ?? 'Terjadi kesalahan, coba lagi');
-      } else {
-        onSuccess();
-        onClose();
+      try {
+        const res = await fetch('/api/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nisn: nisn.trim(),
+            fullname: fullname.trim(),
+            class: studentClass,
+            password,
+          }),
+        });
+        const data = await res.json();
+        if (res.status === 409) {
+          setNisnError('NISN sudah terdaftar');
+        } else if (!res.ok) {
+          setError(data.error ?? 'Terjadi kesalahan, coba lagi');
+        } else {
+          onSuccess();
+          onClose();
+        }
+      } catch {
+        setError('Gagal terhubung ke server. Periksa koneksi internet.');
       }
     } else if (student) {
       const { error: userErr } = await supabase

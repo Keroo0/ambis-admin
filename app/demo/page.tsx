@@ -5,7 +5,7 @@ import { FlaskConical, Trash2, CheckCircle, AlertCircle, Loader2 } from 'lucide-
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
-const DEMO_PREFIX = 'demo0000-0000-0000-0000-';
+const DEMO_PREFIX = 'd0000000-0000-0000-0000-';
 
 const DEMO_STUDENTS = [
   { suffix: '000000000001', name: 'Demo Siswa Satu',   nisn: 'DEMO000001', klass: '10A', gender: 'M' },
@@ -142,7 +142,7 @@ export default function DemoPage() {
       setMessage('Demo data berhasil di-seed. 5 siswa, nilai, absensi, dan 2 izin pending sudah tersedia.');
     } catch (e: unknown) {
       setStatus('error');
-      setMessage(e instanceof Error ? e.message : String(e));
+      setMessage(e instanceof Error ? e.message : (e as { message?: string })?.message ?? String(e));
     }
   }
 
@@ -163,7 +163,7 @@ export default function DemoPage() {
       setMessage('Semua demo data berhasil dihapus.');
     } catch (e: unknown) {
       setStatus('error');
-      setMessage(e instanceof Error ? e.message : String(e));
+      setMessage(e instanceof Error ? e.message : (e as { message?: string })?.message ?? String(e));
     }
   }
 

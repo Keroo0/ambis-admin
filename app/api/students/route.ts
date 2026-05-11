@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = createHash('sha256').update(password).digest('hex');
 
+  const now = Date.now();
+
   const { error: userError } = await supabaseAdmin.from('users').insert({
     id: userId,
     nisn: nisn.trim(),
@@ -62,6 +64,8 @@ export async function POST(req: NextRequest) {
     role: 'siswa',
     is_active: true,
     password_hash: passwordHash,
+    created_at: now,
+    updated_at: now,
   });
 
   if (userError) {
@@ -73,6 +77,8 @@ export async function POST(req: NextRequest) {
     id: userId,
     nisn: nisn.trim(),
     class: studentClass,
+    created_at: now,
+    updated_at: now,
   });
 
   if (studentError) {

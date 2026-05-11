@@ -26,8 +26,10 @@ export default function AttendancePage() {
   const [rejectModal, setRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [adminId, setAdminId] = useState<string | null>(null);
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
     load();
   }, []);
 
@@ -81,21 +83,26 @@ export default function AttendancePage() {
   async function handleApprove(id: string) {
     setActionLoading(id);
     const req = pending.find((r) => r.id === id);
-    await supabase
+    const { error: updateErr } = await supabase
       .from('leave_requests')
       .update({ status: 'approved', reviewed_at: Date.now() })
       .eq('id', id);
+    if (updateErr) {
+      setActionLoading(null);
+      return;
+    }
     setPending((prev) => prev.filter((r) => r.id !== id));
     setPendingCount((c) => c - 1);
     setApprovedToday((c) => c + 1);
     setActionLoading(null);
     try {
       await supabase.from('audit_log').insert({
+        admin_id: adminId,
         action: 'approve_leave',
         entity_type: 'leave',
         entity_id: id,
-        old_value: JSON.stringify({ status: 'pending' }),
-        new_value: JSON.stringify({ status: 'approved', student_id: req?.student_id }),
+        old_value: { status: 'pending' },
+        new_value: { status: 'approved', student_id: req?.student_id },
         created_at: Date.now(),
       });
     } catch (_) { /* non-blocking */ }
@@ -120,11 +127,12 @@ export default function AttendancePage() {
     setActionLoading(null);
     try {
       await supabase.from('audit_log').insert({
+        admin_id: adminId,
         action: 'reject_leave',
         entity_type: 'leave',
         entity_id: id,
-        old_value: JSON.stringify({ status: 'pending' }),
-        new_value: JSON.stringify({ status: 'rejected', rejected_reason: reason.trim() || null, student_id: req?.student_id }),
+        old_value: { status: 'pending' },
+        new_value: { status: 'rejected', rejected_reason: reason.trim() || null, student_id: req?.student_id },
         created_at: Date.now(),
       });
     } catch (_) { /* non-blocking */ }
