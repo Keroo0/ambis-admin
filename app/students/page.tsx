@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { UserPlus, Download, Pencil, Search, RefreshCw } from 'lucide-react';
+import { UserPlus, Download, Pencil, Search, Camera, CameraOff, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import StudentModal from '@/components/students/StudentModal';
 import ResetFaceDialog from '@/components/students/ResetFaceDialog';
+import DeleteStudentDialog from '@/components/students/DeleteStudentDialog';
 
 interface StudentRow {
   id: string;
@@ -61,6 +62,9 @@ export default function StudentsPage() {
 
   const [showReset, setShowReset] = useState(false);
   const [resetTarget, setResetTarget] = useState<{ id: string; name: string } | null>(null);
+
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     supabase.from('students').select('class').then(({ data }) => {
@@ -132,6 +136,11 @@ export default function StudentsPage() {
   function openReset(s: StudentRow) {
     setResetTarget({ id: s.id, name: s.fullname });
     setShowReset(true);
+  }
+
+  function openDelete(s: StudentRow) {
+    setDeleteTarget({ id: s.id, name: s.fullname });
+    setShowDelete(true);
   }
 
   return (
@@ -219,9 +228,20 @@ export default function StudentsPage() {
                       className="p-1.5 rounded-lg hover:bg-[#f2f4f6] transition-colors" style={{ color: '#43474f' }}>
                       <Pencil size={15} />
                     </button>
-                    <button onClick={() => openReset(s)} title="Reset data wajah"
+                    {s.has_face ? (
+                      <button onClick={() => openReset(s)} title="Hapus data wajah"
+                        className="p-1.5 rounded-lg hover:bg-[#ffdad6] transition-colors" style={{ color: '#ba1a1a' }}>
+                        <Camera size={15} />
+                      </button>
+                    ) : (
+                      <button disabled title="Belum ada data wajah"
+                        className="p-1.5 rounded-lg opacity-40 cursor-not-allowed" style={{ color: '#747780' }}>
+                        <CameraOff size={15} />
+                      </button>
+                    )}
+                    <button onClick={() => openDelete(s)} title="Hapus siswa"
                       className="p-1.5 rounded-lg hover:bg-[#ffdad6] transition-colors" style={{ color: '#ba1a1a' }}>
-                      <RefreshCw size={15} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </td>
@@ -258,6 +278,14 @@ export default function StudentsPage() {
           studentId={resetTarget.id}
           studentName={resetTarget.name}
           onClose={() => { setShowReset(false); setResetTarget(null); }}
+          onSuccess={load}
+        />
+      )}
+      {showDelete && deleteTarget && (
+        <DeleteStudentDialog
+          studentId={deleteTarget.id}
+          studentName={deleteTarget.name}
+          onClose={() => { setShowDelete(false); setDeleteTarget(null); }}
           onSuccess={load}
         />
       )}
