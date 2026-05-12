@@ -89,3 +89,20 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ id: userId }, { status: 201 });
 }
+
+export async function DELETE(req: NextRequest) {
+  const body = await req.json() as { id?: string };
+  const { id } = body;
+
+  if (!id) {
+    return NextResponse.json({ error: 'id wajib diisi' }, { status: 400 });
+  }
+
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}
