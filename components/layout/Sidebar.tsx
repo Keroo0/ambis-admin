@@ -71,7 +71,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
                 backgroundColor: active ? '#264778' : 'transparent',
                 color: active ? '#a9c7ff' : '#c4c6d0',
               }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-colors hover:bg-[#002b5b]"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-[background-color,transform] duration-150 hover:bg-[#002b5b] active:scale-[0.97]"
             >
               <Icon size={18} />
               {label}
@@ -83,7 +83,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       <div className="px-3 pb-6 border-t border-[#264778] pt-4 mt-2">
         <button
           style={{ color: '#c4c6d0' }}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm hover:bg-[#002b5b] transition-colors"
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm hover:bg-[#002b5b] transition-[background-color,transform] duration-150 active:scale-[0.97]"
         >
           <HelpCircle size={18} />
           Help Center
@@ -91,7 +91,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         <button
           onClick={handleLogout}
           style={{ color: '#ff8a80' }}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm hover:bg-[#002b5b] transition-colors"
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm hover:bg-[#002b5b] transition-[background-color,transform] duration-150 active:scale-[0.97]"
         >
           <LogOut size={18} />
           Logout
