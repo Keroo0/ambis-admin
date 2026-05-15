@@ -8,6 +8,7 @@ import {
   BookOpen,
   CalendarCheck,
   ClipboardList,
+  Megaphone,
   FlaskConical,
   HelpCircle,
   LogOut,
@@ -19,8 +20,9 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/students', label: 'Student Data', icon: Users },
   { href: '/grades', label: 'Grade Input', icon: BookOpen },
-  { href: '/attendance', label: 'Attendance', icon: CalendarCheck },
-  { href: '/audit', label: 'Audit Log', icon: ClipboardList },
+  { href: '/attendance',    label: 'Attendance',    icon: CalendarCheck },
+  { href: '/notifications', label: 'Notifications', icon: Megaphone     },
+  { href: '/audit',         label: 'Audit Log',     icon: ClipboardList },
   { href: '/demo', label: 'Demo Data', icon: FlaskConical },
 ];
 

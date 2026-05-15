@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Users, CalendarCheck, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import GeofenceSection from '@/components/dashboard/GeofenceSection';
+import AttendanceTimeSection from '@/components/dashboard/AttendanceTimeSection';
 
 interface AbsenceRow {
   id: string;
@@ -128,6 +129,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <AttendanceTimeSection />
       <GeofenceSection />
     </div>
   );
