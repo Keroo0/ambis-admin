@@ -77,19 +77,19 @@ export default function AuditPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#191c1e' }}>
+          <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#191c1e' }}>
             Audit Log
           </h1>
-          <p className="text-sm mt-1" style={{ color: '#43474f' }}>
+          <p className="text-xs md:text-sm mt-1" style={{ color: '#43474f' }}>
             Riwayat 100 aksi admin terakhir — hanya baca.
           </p>
         </div>
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-[#f7f9fb] disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-[#f7f9fb] disabled:opacity-50 self-start"
           style={{ borderColor: '#e0e3e5', color: '#43474f' }}
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -99,11 +99,11 @@ export default function AuditPage() {
 
       <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
         {loading ? (
-          <p className="px-5 py-12 text-center text-sm" style={{ color: '#747780' }}>
+          <p className="px-4 md:px-5 py-12 text-center text-sm" style={{ color: '#747780' }}>
             Memuat data...
           </p>
         ) : rows.length === 0 ? (
-          <div className="px-5 py-16 text-center">
+          <div className="px-4 md:px-5 py-16 text-center">
             <ShieldCheck size={40} className="mx-auto mb-3" style={{ color: '#007169' }} />
             <p className="font-medium text-sm" style={{ color: '#191c1e' }}>
               Belum ada log audit.
@@ -113,48 +113,50 @@ export default function AuditPage() {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ backgroundColor: '#001736' }}>
-                {['Waktu', 'Aksi', 'Tipe', 'Entity ID', 'Detail'].map((h) => (
-                  <th
-                    key={h}
-                    className="px-5 py-3 text-left text-xs font-semibold text-white"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr
-                  key={row.id}
-                  className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]"
-                  style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafbfc' }}
-                >
-                  <td className="px-5 py-3 text-xs whitespace-nowrap" style={{ color: '#43474f' }}>
-                    {formatTs(row.created_at)}
-                  </td>
-                  <td className="px-5 py-3">
-                    <ActionBadge action={row.action} />
-                  </td>
-                  <td className="px-5 py-3 text-xs capitalize" style={{ color: '#43474f' }}>
-                    {row.entity_type}
-                  </td>
-                  <td className="px-5 py-3 font-mono text-xs" style={{ color: '#747780' }}>
-                    <span title={row.entity_id}>{row.entity_id.slice(0, 8)}…</span>
-                  </td>
-                  <td
-                    className="px-5 py-3 text-xs max-w-xs truncate"
-                    style={{ color: '#43474f' }}
-                  >
-                    {previewValue(row.new_value)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[550px]">
+              <thead>
+                <tr style={{ backgroundColor: '#001736' }}>
+                  {['Waktu', 'Aksi', 'Tipe', 'Entity ID', 'Detail'].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 md:px-5 py-3 text-left text-xs font-semibold text-white whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr
+                    key={row.id}
+                    className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]"
+                    style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafbfc' }}
+                  >
+                    <td className="px-4 md:px-5 py-3 text-xs whitespace-nowrap" style={{ color: '#43474f' }}>
+                      {formatTs(row.created_at)}
+                    </td>
+                    <td className="px-4 md:px-5 py-3">
+                      <ActionBadge action={row.action} />
+                    </td>
+                    <td className="px-4 md:px-5 py-3 text-xs capitalize whitespace-nowrap" style={{ color: '#43474f' }}>
+                      {row.entity_type}
+                    </td>
+                    <td className="px-4 md:px-5 py-3 font-mono text-xs" style={{ color: '#747780' }}>
+                      <span title={row.entity_id} className="truncate max-w-[80px] inline-block align-bottom">{row.entity_id.slice(0, 8)}…</span>
+                    </td>
+                    <td
+                      className="px-4 md:px-5 py-3 text-xs max-w-[200px] truncate"
+                      style={{ color: '#43474f' }}
+                    >
+                      {previewValue(row.new_value)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

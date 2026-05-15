@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
-import Header from "@/components/layout/Header";
+import AppShell from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
   title: "STAKAD SMAN 07 — Admin",
@@ -16,11 +15,7 @@ export default function RootLayout({
   return (
     <html lang="id" className="h-full antialiased">
       <body className="h-full" style={{ backgroundColor: '#f7f9fb' }}>
-        <Sidebar />
-        <Header />
-        <main style={{ marginLeft: 240, paddingTop: 56, minHeight: '100vh' }}>
-          <div className="p-6">{children}</div>
-        </main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

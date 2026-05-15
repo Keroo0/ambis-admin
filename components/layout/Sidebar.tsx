@@ -11,6 +11,7 @@ import {
   FlaskConical,
   HelpCircle,
   LogOut,
+  X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -23,7 +24,7 @@ const navItems = [
   { href: '/demo', label: 'Demo Data', icon: FlaskConical },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -36,10 +37,9 @@ export default function Sidebar() {
   return (
     <aside
       style={{ backgroundColor: '#001736', width: 240, minHeight: '100vh' }}
-      className="flex flex-col fixed left-0 top-0 bottom-0 z-30"
+      className="flex flex-col"
     >
-      {/* Logo */}
-      <div className="px-5 pt-6 pb-4">
+      <div className="flex items-center justify-between px-5 pt-6 pb-4">
         <div className="flex items-center gap-3">
           <div
             style={{ backgroundColor: '#264778' }}
@@ -52,9 +52,13 @@ export default function Sidebar() {
             <p style={{ color: '#7594ca' }} className="text-xs leading-tight">Kab. Tangerang</p>
           </div>
         </div>
+        {onClose && (
+          <button onClick={onClose} className="text-white/60 hover:text-white md:hidden p-1">
+            <X size={20} />
+          </button>
+        )}
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-2">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
@@ -62,6 +66,7 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               style={{
                 backgroundColor: active ? '#264778' : 'transparent',
                 color: active ? '#a9c7ff' : '#c4c6d0',
@@ -75,7 +80,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom */}
       <div className="px-3 pb-6 border-t border-[#264778] pt-4 mt-2">
         <button
           style={{ color: '#c4c6d0' }}

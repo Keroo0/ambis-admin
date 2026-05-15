@@ -56,7 +56,6 @@ export default function GradesPage() {
     supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
   }, []);
 
-  // Load available classes from students table
   useEffect(() => {
     supabase
       .from('students')
@@ -78,7 +77,6 @@ export default function GradesPage() {
     const from = (page - 1) * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
-    // Fetch students in this class via students table join
     const { data: stuData, count } = await supabase
       .from('students')
       .select('id, nisn, class, users!students_id_fkey(fullname)', { count: 'exact' })
@@ -90,12 +88,14 @@ export default function GradesPage() {
 
     if (!stuData) { setLoading(false); return; }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows: StudentRow[] = stuData.map((s: any) => ({
-      id: s.id,
-      nisn: s.nisn,
-      fullname: s.users?.fullname ?? '-',
-    }));
+    const rows: StudentRow[] = stuData.map((s: Record<string, unknown>) => {
+      const u = s.users as Record<string, string> | null;
+      return {
+        id: s.id as string,
+        nisn: s.nisn as string,
+        fullname: u?.fullname ?? '-',
+      };
+    });
     setStudents(rows);
 
     const ids = rows.map((r) => r.id);
@@ -114,11 +114,10 @@ export default function GradesPage() {
       map[s.id] = { uts: '', uas: '', utsId: null, uasId: null, status: 'pending' };
     });
     if (gradeData) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      gradeData.forEach((g: any) => {
-        if (!map[g.student_id]) return;
-        if (g.type === 'UTS') { map[g.student_id].uts = String(g.score); map[g.student_id].utsId = g.id; }
-        if (g.type === 'UAS') { map[g.student_id].uas = String(g.score); map[g.student_id].uasId = g.id; }
+      gradeData.forEach((g: Record<string, unknown>) => {
+        if (!map[g.student_id as string]) return;
+        if (g.type === 'UTS') { map[g.student_id as string].uts = String(g.score); map[g.student_id as string].utsId = g.id as string; }
+        if (g.type === 'UAS') { map[g.student_id as string].uas = String(g.score); map[g.student_id as string].uasId = g.id as string; }
       });
       rows.forEach((s) => {
         const e = map[s.id];
@@ -209,14 +208,14 @@ export default function GradesPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#191c1e' }}>Input Nilai</h1>
-          <p className="text-sm mt-1" style={{ color: '#43474f' }}>
+          <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#191c1e' }}>Input Nilai</h1>
+          <p className="text-xs md:text-sm mt-1" style={{ color: '#43474f' }}>
             Pilih kelas dan mata pelajaran untuk mengisi nilai UTS dan UAS.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {saveSuccess && (
             <span className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>
               ✓ Nilai tersimpan
@@ -247,13 +246,9 @@ export default function GradesPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
         <div>
-          <label
-            className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
-            style={{ color: '#43474f' }}
-          >
+          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: '#43474f' }}>
             Tahun Ajaran / Semester
           </label>
           <div className="flex gap-2">
@@ -278,10 +273,7 @@ export default function GradesPage() {
         </div>
 
         <div>
-          <label
-            className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
-            style={{ color: '#43474f' }}
-          >
+          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: '#43474f' }}>
             Kelas
           </label>
           <select
@@ -296,10 +288,7 @@ export default function GradesPage() {
         </div>
 
         <div>
-          <label
-            className="block text-xs font-semibold mb-1.5 uppercase tracking-wide"
-            style={{ color: '#43474f' }}
-          >
+          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: '#43474f' }}>
             Mata Pelajaran
           </label>
           <select
@@ -313,85 +302,85 @@ export default function GradesPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ backgroundColor: '#001736' }}>
-              {['No', 'NISN', 'Nama Siswa', 'Nilai UTS', 'Nilai UAS', 'Status'].map((h) => (
-                <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-white">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>
-                  Memuat data...
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
+            <thead>
+              <tr style={{ backgroundColor: '#001736' }}>
+                {['No', 'NISN', 'Nama Siswa', 'Nilai UTS', 'Nilai UAS', 'Status'].map((h) => (
+                  <th key={h} className="px-4 md:px-5 py-3 text-left text-xs font-semibold text-white whitespace-nowrap">{h}</th>
+                ))}
               </tr>
-            ) : students.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>
-                  {selectedClass ? 'Tidak ada siswa di kelas ini.' : 'Pilih kelas untuk menampilkan siswa.'}
-                </td>
-              </tr>
-            ) : (
-              students.map((s, i) => {
-                const entry = grades[s.id] ?? { uts: '', uas: '', utsId: null, uasId: null, status: 'pending' as const };
-                return (
-                  <tr key={s.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
-                    <td className="px-5 py-3 text-xs" style={{ color: '#747780' }}>
-                      {(page - 1) * PAGE_SIZE + i + 1}
-                    </td>
-                    <td className="px-5 py-3" style={{ color: '#43474f' }}>{s.nisn}</td>
-                    <td className="px-5 py-3 font-medium" style={{ color: '#191c1e' }}>{s.fullname}</td>
-                    <td className="px-5 py-3">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.1}
-                        value={entry.uts}
-                        onChange={(e) => handleChange(s.id, 'uts', e.target.value)}
-                        placeholder="—"
-                        className="w-20 px-2.5 py-1.5 text-sm rounded-lg border text-center outline-none focus:ring-2 focus:ring-[#264778]"
-                        style={{
-                          borderColor: entry.status === 'editing' ? '#405f91' : '#e0e3e5',
-                          backgroundColor: entry.status === 'editing' ? '#f0f4ff' : '#ffffff',
-                        }}
-                      />
-                    </td>
-                    <td className="px-5 py-3">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.1}
-                        value={entry.uas}
-                        onChange={(e) => handleChange(s.id, 'uas', e.target.value)}
-                        placeholder="—"
-                        className="w-20 px-2.5 py-1.5 text-sm rounded-lg border text-center outline-none focus:ring-2 focus:ring-[#264778]"
-                        style={{
-                          borderColor: entry.status === 'editing' ? '#405f91' : '#e0e3e5',
-                          backgroundColor: entry.status === 'editing' ? '#f0f4ff' : '#ffffff',
-                        }}
-                      />
-                    </td>
-                    <td className="px-5 py-3">
-                      <StatusBadge status={entry.status} />
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>
+                    Memuat data...
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>
+                    {selectedClass ? 'Tidak ada siswa di kelas ini.' : 'Pilih kelas untuk menampilkan siswa.'}
+                  </td>
+                </tr>
+              ) : (
+                students.map((s, i) => {
+                  const entry = grades[s.id] ?? { uts: '', uas: '', utsId: null, uasId: null, status: 'pending' as const };
+                  return (
+                    <tr key={s.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
+                      <td className="px-4 md:px-5 py-3 text-xs" style={{ color: '#747780' }}>
+                        {(page - 1) * PAGE_SIZE + i + 1}
+                      </td>
+                      <td className="px-4 md:px-5 py-3 whitespace-nowrap" style={{ color: '#43474f' }}>{s.nisn}</td>
+                      <td className="px-4 md:px-5 py-3 font-medium whitespace-nowrap" style={{ color: '#191c1e' }}>{s.fullname}</td>
+                      <td className="px-4 md:px-5 py-3">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          value={entry.uts}
+                          onChange={(e) => handleChange(s.id, 'uts', e.target.value)}
+                          placeholder="—"
+                          className="w-20 px-2.5 py-1.5 text-sm rounded-lg border text-center outline-none focus:ring-2 focus:ring-[#264778]"
+                          style={{
+                            borderColor: entry.status === 'editing' ? '#405f91' : '#e0e3e5',
+                            backgroundColor: entry.status === 'editing' ? '#f0f4ff' : '#ffffff',
+                          }}
+                        />
+                      </td>
+                      <td className="px-4 md:px-5 py-3">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          value={entry.uas}
+                          onChange={(e) => handleChange(s.id, 'uas', e.target.value)}
+                          placeholder="—"
+                          className="w-20 px-2.5 py-1.5 text-sm rounded-lg border text-center outline-none focus:ring-2 focus:ring-[#264778]"
+                          style={{
+                            borderColor: entry.status === 'editing' ? '#405f91' : '#e0e3e5',
+                            backgroundColor: entry.status === 'editing' ? '#f0f4ff' : '#ffffff',
+                          }}
+                        />
+                      </td>
+                      <td className="px-4 md:px-5 py-3">
+                        <StatusBadge status={entry.status} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Pagination */}
       {total > 0 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mt-4">
           <p className="text-xs" style={{ color: '#747780' }}>
             Menampilkan {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} dari {total} siswa
           </p>
@@ -452,17 +441,17 @@ export default function GradesPage() {
 
 function StatusBadge({ status }: { status: GradeEntry['status'] }) {
   if (status === 'saved') return (
-    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>
       ✓ Tersimpan
     </span>
   );
   if (status === 'editing') return (
-    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#d6e3ff', color: '#264778' }}>
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#d6e3ff', color: '#264778' }}>
       Belum disimpan
     </span>
   );
   return (
-    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#e6e8ea', color: '#43474f' }}>
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#e6e8ea', color: '#43474f' }}>
       Kosong
     </span>
   );

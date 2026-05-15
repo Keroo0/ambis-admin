@@ -47,7 +47,6 @@ export default function DemoPage() {
     try {
       const now = Date.now();
 
-      // 1. Users
       const users = DEMO_STUDENTS.map((s) => ({
         id: DEMO_PREFIX + s.suffix,
         nisn: s.nisn,
@@ -62,7 +61,6 @@ export default function DemoPage() {
       const { error: uErr } = await supabase.from('users').upsert(users, { onConflict: 'id' });
       if (uErr) throw uErr;
 
-      // 2. Students
       const students = DEMO_STUDENTS.map((s) => ({
         id: DEMO_PREFIX + s.suffix,
         nisn: s.nisn,
@@ -74,7 +72,6 @@ export default function DemoPage() {
       const { error: sErr } = await supabase.from('students').upsert(students, { onConflict: 'id' });
       if (sErr) throw sErr;
 
-      // 3. Grades
       const grades: object[] = [];
       DEMO_STUDENTS.forEach((stu, si) => {
         SUBJECTS.forEach((subj, subji) => {
@@ -87,7 +84,6 @@ export default function DemoPage() {
       const { error: gErr } = await supabase.from('grades').insert(grades);
       if (gErr) throw gErr;
 
-      // 4. Attendance (last 5 weekdays)
       const weekdays = getWeekdays(5);
       const attendance: object[] = [];
       DEMO_STUDENTS.forEach((stu) => {
@@ -110,7 +106,6 @@ export default function DemoPage() {
       const { error: aErr } = await supabase.from('attendance').insert(attendance);
       if (aErr) throw aErr;
 
-      // 5. Leave requests (2 pending)
       const leaves = [
         {
           id: uuidv4(),
@@ -152,7 +147,6 @@ export default function DemoPage() {
     try {
       const ids = DEMO_STUDENTS.map((s) => DEMO_PREFIX + s.suffix);
 
-      // Delete in FK order
       await supabase.from('leave_requests').delete().in('student_id', ids);
       await supabase.from('attendance').delete().in('student_id', ids);
       await supabase.from('grades').delete().in('student_id', ids);
@@ -170,22 +164,21 @@ export default function DemoPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: '#191c1e' }}>
+        <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#191c1e' }}>
           Demo Data
         </h1>
-        <p className="text-sm mt-1" style={{ color: '#43474f' }}>
+        <p className="text-xs md:text-sm mt-1" style={{ color: '#43474f' }}>
           Seed atau hapus data demo untuk keperluan presentasi thesis.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        {/* Seed card */}
-        <div className="bg-white rounded-xl border border-[#e0e3e5] p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-6">
+        <div className="bg-white rounded-xl border border-[#e0e3e5] p-5 md:p-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>
               <FlaskConical size={20} />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="font-semibold text-sm" style={{ color: '#191c1e' }}>Seed Demo Data</p>
               <p className="text-xs" style={{ color: '#747780' }}>5 siswa, nilai, absensi, izin</p>
             </div>
@@ -207,13 +200,12 @@ export default function DemoPage() {
           </button>
         </div>
 
-        {/* Delete card */}
-        <div className="bg-white rounded-xl border border-[#e0e3e5] p-6">
+        <div className="bg-white rounded-xl border border-[#e0e3e5] p-5 md:p-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#ffdad6', color: '#ba1a1a' }}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#ffdad6', color: '#ba1a1a' }}>
               <Trash2 size={20} />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="font-semibold text-sm" style={{ color: '#191c1e' }}>Hapus Demo Data</p>
               <p className="text-xs" style={{ color: '#747780' }}>Bersihkan semua data demo</p>
             </div>
@@ -233,7 +225,6 @@ export default function DemoPage() {
         </div>
       </div>
 
-      {/* Result banner */}
       {(status === 'done' || status === 'error') && message && (
         <div
           className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm"

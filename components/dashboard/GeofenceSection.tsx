@@ -86,20 +86,19 @@ export default function GeofenceSection() {
 
   return (
     <div className="bg-white rounded-xl border border-[#e0e3e5] mt-6 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-[#e0e3e5]">
+      <div className="flex items-center justify-between px-4 md:px-5 py-4 border-b border-[#e0e3e5]">
         <div className="flex items-center gap-2">
           <MapPin size={16} style={{ color: '#006A63' }} />
           <h2 className="font-semibold text-sm" style={{ color: '#191c1e' }}>Pengaturan Lokasi Absensi</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: '#747780' }}>
+          <span className="text-xs hidden sm:inline" style={{ color: '#747780' }}>
             {enabled ? 'Aktif' : 'Nonaktif'}
           </span>
           <button
             type="button"
             onClick={() => setEnabled(v => !v)}
-            className="relative w-11 h-6 rounded-full transition-colors duration-200"
+            className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0"
             style={{ backgroundColor: enabled ? '#006A63' : '#e0e3e5' }}
           >
             <span
@@ -110,8 +109,7 @@ export default function GeofenceSection() {
         </div>
       </div>
 
-      {/* Body */}
-      <div className={`p-5 ${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
+      <div className={`p-4 md:p-5 ${!enabled ? 'opacity-40 pointer-events-none' : ''}`}>
         {loadingSettings ? (
           <div style={{ height: 320, backgroundColor: '#f7f9fb', borderRadius: 12 }}
             className="flex items-center justify-center">
@@ -127,7 +125,7 @@ export default function GeofenceSection() {
           />
         )}
 
-        <div className="grid grid-cols-3 gap-3 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#43474f' }}>
               Latitude
@@ -173,8 +171,7 @@ export default function GeofenceSection() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between px-5 py-3 border-t border-[#f2f4f6]">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 md:px-5 py-3 border-t border-[#f2f4f6]">
         <span
           className="text-sm"
           style={{ color: savedMsg.startsWith('Error') ? '#ba1a1a' : '#006A63', minHeight: 20 }}
@@ -184,7 +181,7 @@ export default function GeofenceSection() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition-opacity"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition-opacity w-full sm:w-auto justify-center"
           style={{ backgroundColor: '#001736' }}
         >
           <Save size={14} />

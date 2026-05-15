@@ -57,21 +57,23 @@ export default function AttendancePage() {
     ]);
 
     if (pendingRes.data) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rows = pendingRes.data.map((r: any) => ({
-        id: r.id,
-        student_id: r.student_id,
-        type: r.type,
-        reason: r.reason,
-        attachment_url: r.attachment_url,
-        status: r.status,
-        date_from: r.date_from,
-        date_to: r.date_to,
-        created_at: r.created_at,
-        student: r.students
-          ? { fullname: r.students.users?.fullname ?? '-', class: r.students.class ?? '-' }
-          : null,
-      }));
+      const rows = pendingRes.data.map((r: Record<string, unknown>) => {
+        const stu = r.students as Record<string, unknown> | null;
+        return {
+          id: r.id as string,
+          student_id: r.student_id as string,
+          type: r.type as string,
+          reason: r.reason as string | null,
+          attachment_url: r.attachment_url as string | null,
+          status: r.status as string,
+          date_from: r.date_from as string | null,
+          date_to: r.date_to as string | null,
+          created_at: r.created_at as number,
+          student: stu
+            ? { fullname: (stu.users as Record<string, string> | null)?.fullname ?? '-', class: stu.class as string ?? '-' }
+            : null,
+        };
+      });
       setPending(rows);
       setPendingCount(rows.length);
     }
@@ -146,16 +148,15 @@ export default function AttendancePage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: '#191c1e' }}>
+        <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#191c1e' }}>
           Persetujuan Izin &amp; Sakit
         </h1>
-        <p className="text-sm mt-1" style={{ color: '#43474f' }}>
+        <p className="text-xs md:text-sm mt-1" style={{ color: '#43474f' }}>
           Tinjau dan setujui pengajuan izin dan sakit yang masuk.
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6">
         <StatCard
           label="MENUNGGU PERSETUJUAN"
           value={pendingCount}
@@ -179,29 +180,28 @@ export default function AttendancePage() {
         />
       </div>
 
-      {/* Cards */}
       {loading ? (
         <p className="text-sm" style={{ color: '#747780' }}>Memuat data...</p>
       ) : pending.length === 0 ? (
-        <div className="bg-white rounded-xl border border-[#e0e3e5] p-12 text-center">
+        <div className="bg-white rounded-xl border border-[#e0e3e5] p-8 md:p-12 text-center">
           <CheckCircle size={40} className="mx-auto mb-3" style={{ color: '#007169' }} />
           <p className="font-medium" style={{ color: '#191c1e' }}>
             Tidak ada pengajuan yang menunggu persetujuan
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           {pending.map((req) => {
             const t = typeLabel(req.type);
             const busy = actionLoading === req.id;
             return (
-              <div key={req.id} className="bg-white rounded-xl border border-[#e0e3e5] p-5">
+              <div key={req.id} className="bg-white rounded-xl border border-[#e0e3e5] p-4 md:p-5">
                 <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-semibold text-sm" style={{ color: '#191c1e' }}>
+                  <div className="min-w-0 flex-1 mr-2">
+                    <p className="font-semibold text-sm truncate" style={{ color: '#191c1e' }}>
                       {req.student?.fullname ?? req.student_id}
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: '#747780' }}>
+                    <p className="text-xs mt-0.5 truncate" style={{ color: '#747780' }}>
                       {req.student?.class}
                       {req.date_from
                         ? ` • ${req.date_from}${req.date_to && req.date_to !== req.date_from ? ` – ${req.date_to}` : ''}`
@@ -209,7 +209,7 @@ export default function AttendancePage() {
                     </p>
                   </div>
                   <span
-                    className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+                    className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                     style={{ backgroundColor: t.bg, color: t.color }}
                   >
                     {t.label}
@@ -234,11 +234,11 @@ export default function AttendancePage() {
                       href={req.attachment_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-2 text-xs p-2.5 rounded-lg border border-[#e0e3e5] hover:bg-[#f7f9fb]"
+                      className="flex items-center gap-2 text-xs p-2.5 rounded-lg border border-[#e0e3e5] hover:bg-[#f7f9fb] truncate"
                       style={{ color: '#405f91' }}
                     >
                       <span>📎</span>
-                      <span>Lihat lampiran</span>
+                      <span className="truncate">Lihat lampiran</span>
                     </a>
                   </div>
                 )}
@@ -268,9 +268,8 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {/* Reject reason modal */}
       {rejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
             <h3 className="font-semibold text-base mb-1" style={{ color: '#191c1e' }}>
               Alasan Penolakan
@@ -324,19 +323,19 @@ function StatCard({
   iconColor: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-[#e0e3e5] p-5">
+    <div className="bg-white rounded-xl border border-[#e0e3e5] p-4 md:p-5">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#43474f' }}>
           {label}
         </p>
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: iconBg, color: iconColor }}
         >
           {icon}
         </div>
       </div>
-      <p className="text-3xl font-bold" style={{ color: '#191c1e' }}>
+      <p className="text-2xl md:text-3xl font-bold" style={{ color: '#191c1e' }}>
         {value}
       </p>
     </div>

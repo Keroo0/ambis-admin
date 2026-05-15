@@ -32,13 +32,13 @@ function initials(name: string) {
 
 function StatusBadge({ isActive, hasFace }: { isActive: boolean; hasFace: boolean }) {
   if (!hasFace) return (
-    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#d6e3ff', color: '#264778' }}>Pending Setup</span>
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#d6e3ff', color: '#264778' }}>Pending Setup</span>
   );
   if (isActive) return (
-    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>Active</span>
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>Active</span>
   );
   return (
-    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: '#ffdad6', color: '#ba1a1a' }}>Inactive</span>
+    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#ffdad6', color: '#ba1a1a' }}>Inactive</span>
   );
 }
 
@@ -100,15 +100,18 @@ export default function StudentsPage() {
     setTotal(count ?? 0);
 
     if (data) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setStudents(data.map((u: any) => ({
-        id: u.id,
-        nisn: u.nisn,
-        fullname: u.fullname,
-        is_active: u.is_active,
-        class: u.students?.class ?? '—',
-        has_face: Array.isArray(u.students?.face_embeddings) ? u.students.face_embeddings.length > 0 : !!u.students?.face_embeddings,
-      })));
+      setStudents(data.map((u: Record<string, unknown>) => {
+        const stu = u.students as Record<string, unknown> | null;
+        const faces = stu?.face_embeddings as unknown[];
+        return {
+          id: u.id as string,
+          nisn: u.nisn as string,
+          fullname: u.fullname as string,
+          is_active: u.is_active as boolean,
+          class: (stu?.class as string) ?? '—',
+          has_face: Array.isArray(faces) ? faces.length > 0 : !!stu?.face_embeddings,
+        };
+      }));
     }
     setLoading(false);
   }, [page, search, classFilter, statusFilter]);
@@ -136,10 +139,10 @@ export default function StudentsPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#191c1e' }}>Student Data Management</h1>
-          <p className="text-sm mt-1" style={{ color: '#43474f' }}>Manage enrollments, NISN records, and account statuses.</p>
+          <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#191c1e' }}>Student Data Management</h1>
+          <p className="text-xs md:text-sm mt-1" style={{ color: '#43474f' }}>Manage enrollments, NISN records, and account statuses.</p>
         </div>
         <div className="flex gap-2">
           <button className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-[#f7f9fb]" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
@@ -155,80 +158,82 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+        <div className="relative w-full sm:w-auto">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#747780' }} />
           <input
             type="text"
             placeholder="Search students..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-9 pr-4 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-[#264778]"
-            style={{ borderColor: '#e0e3e5', width: 220 }}
+            className="pl-9 pr-4 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-[#264778] w-full sm:w-56"
+            style={{ borderColor: '#e0e3e5' }}
           />
         </div>
         <select value={classFilter} onChange={(e) => { setClassFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 text-sm rounded-lg border outline-none" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
+          className="px-3 py-2 text-sm rounded-lg border outline-none w-full sm:w-auto" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
           <option value="">All Classes</option>
           {classes.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 text-sm rounded-lg border outline-none" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
+          className="px-3 py-2 text-sm rounded-lg border outline-none w-full sm:w-auto" style={{ borderColor: '#e0e3e5', color: '#43474f' }}>
           <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
-        <p className="ml-auto text-xs" style={{ color: '#747780' }}>
-          Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString()} students
+        <p className="text-xs sm:ml-auto" style={{ color: '#747780' }}>
+          Showing {total === 0 ? 0 : ((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString()} students
         </p>
       </div>
 
       <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ backgroundColor: '#f7f9fb' }}>
-              {['Name', 'NISN', 'Class', 'Account Status', 'Actions'].map((h) => (
-                <th key={h} className="px-5 py-3 text-left text-xs font-semibold" style={{ color: '#43474f' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
-            ) : loadError ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: '#ba1a1a' }}>{loadError}</td></tr>
-            ) : students.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Tidak ada siswa ditemukan</td></tr>
-            ) : students.map((s) => (
-              <tr key={s.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
-                <td className="px-5 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                      style={{ backgroundColor: avatarColor(s.fullname) }}>
-                      {initials(s.fullname)}
-                    </div>
-                    <span className="font-medium" style={{ color: '#191c1e' }}>{s.fullname}</span>
-                  </div>
-                </td>
-                <td className="px-5 py-3" style={{ color: '#43474f' }}>{s.nisn}</td>
-                <td className="px-5 py-3" style={{ color: '#43474f' }}>{s.class}</td>
-                <td className="px-5 py-3"><StatusBadge isActive={s.is_active} hasFace={s.has_face} /></td>
-                <td className="px-5 py-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => openEdit(s)} title="Edit siswa"
-                      className="p-1.5 rounded-lg hover:bg-[#f2f4f6] transition-colors" style={{ color: '#43474f' }}>
-                      <Pencil size={15} />
-                    </button>
-                    <button onClick={() => openReset(s)} title="Reset data wajah"
-                      className="p-1.5 rounded-lg hover:bg-[#ffdad6] transition-colors" style={{ color: '#ba1a1a' }}>
-                      <RefreshCw size={15} />
-                    </button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
+            <thead>
+              <tr style={{ backgroundColor: '#f7f9fb' }}>
+                {['Name', 'NISN', 'Class', 'Account Status', 'Actions'].map((h) => (
+                  <th key={h} className="px-4 md:px-5 py-3 text-left text-xs font-semibold whitespace-nowrap" style={{ color: '#43474f' }}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={5} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan={5} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#ba1a1a' }}>{loadError}</td></tr>
+              ) : students.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Tidak ada siswa ditemukan</td></tr>
+              ) : students.map((s) => (
+                <tr key={s.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
+                  <td className="px-4 md:px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                        style={{ backgroundColor: avatarColor(s.fullname) }}>
+                        {initials(s.fullname)}
+                      </div>
+                      <span className="font-medium whitespace-nowrap" style={{ color: '#191c1e' }}>{s.fullname}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 md:px-5 py-3 whitespace-nowrap" style={{ color: '#43474f' }}>{s.nisn}</td>
+                  <td className="px-4 md:px-5 py-3 whitespace-nowrap" style={{ color: '#43474f' }}>{s.class}</td>
+                  <td className="px-4 md:px-5 py-3"><StatusBadge isActive={s.is_active} hasFace={s.has_face} /></td>
+                  <td className="px-4 md:px-5 py-3">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => openEdit(s)} title="Edit siswa"
+                        className="p-1.5 rounded-lg hover:bg-[#f2f4f6] transition-colors" style={{ color: '#43474f' }}>
+                        <Pencil size={15} />
+                      </button>
+                      <button onClick={() => openReset(s)} title="Reset data wajah"
+                        className="p-1.5 rounded-lg hover:bg-[#ffdad6] transition-colors" style={{ color: '#ba1a1a' }}>
+                        <RefreshCw size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {totalPages > 1 && (
