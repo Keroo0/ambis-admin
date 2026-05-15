@@ -157,7 +157,7 @@ export default function GradesPage() {
           score: parseFloat(entry.uts),
           semester,
           year,
-          created_at: now,
+          ...(entry.utsId ? {} : { created_at: now }),
           updated_at: now,
         });
       }
@@ -170,7 +170,7 @@ export default function GradesPage() {
           score: parseFloat(entry.uas),
           semester,
           year,
-          created_at: now,
+          ...(entry.uasId ? {} : { created_at: now }),
           updated_at: now,
         });
       }
@@ -291,14 +291,18 @@ export default function GradesPage() {
           <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: '#43474f' }}>
             Mata Pelajaran
           </label>
-          <select
+          <input
+            type="text"
+            list="subject-options"
             value={selectedSubject}
             onChange={(e) => { setSelectedSubject(e.target.value); setPage(1); }}
             className="w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-[#264778]"
             style={{ borderColor: '#e0e3e5', color: '#43474f' }}
-          >
-            {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+            placeholder="Pilih atau ketik mata pelajaran..."
+          />
+          <datalist id="subject-options">
+            {SUBJECTS.map((s) => <option key={s} value={s} />)}
+          </datalist>
         </div>
       </div>
 

@@ -83,7 +83,7 @@ export default function StudentsPage() {
 
     let query = supabase
       .from('users')
-      .select('id, nisn, fullname, is_active, students!students_id_fkey(class, face_embeddings!face_embeddings_student_id_fkey(id))', { count: 'exact' })
+      .select('id, nisn, fullname, is_active, students!students_id_fkey!inner(class, face_embeddings!face_embeddings_student_id_fkey(id))', { count: 'exact' })
       .eq('role', 'siswa')
       .order('fullname')
       .range(from, to);

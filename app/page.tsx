@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, CalendarCheck, AlertCircle, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
+import { Users, CalendarCheck, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import GeofenceSection from '@/components/dashboard/GeofenceSection';
 
@@ -91,22 +92,22 @@ export default function DashboardPage() {
       <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
         <div className="flex items-center justify-between px-4 md:px-5 py-4 border-b border-[#e0e3e5]">
           <h2 className="font-semibold text-sm" style={{ color: '#191c1e' }}>Absence Monitoring (Today)</h2>
-          <button className="text-xs font-medium" style={{ color: '#405f91' }}>View All</button>
+          <Link href="/attendance" className="text-xs font-medium" style={{ color: '#405f91' }}>View All</Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[500px]">
             <thead>
               <tr style={{ backgroundColor: '#f7f9fb' }}>
-                {['Student', 'Class', 'Status', 'Notes', 'Action'].map((h) => (
+                {['Student', 'Class', 'Status', 'Notes'].map((h) => (
                   <th key={h} className="px-4 md:px-5 py-3 text-left text-xs font-semibold whitespace-nowrap" style={{ color: '#43474f' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="px-4 md:px-5 py-8 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
+                <tr><td colSpan={4} className="px-4 md:px-5 py-8 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
               ) : absences.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 md:px-5 py-8 text-center text-sm" style={{ color: '#747780' }}>Semua siswa hadir hari ini</td></tr>
+                <tr><td colSpan={4} className="px-4 md:px-5 py-8 text-center text-sm" style={{ color: '#747780' }}>Semua siswa hadir hari ini</td></tr>
               ) : (
                 absences.map((row) => {
                   const s = statusLabel(row.status);
@@ -118,9 +119,6 @@ export default function DashboardPage() {
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: s.bg, color: s.color }}>{s.label}</span>
                       </td>
                       <td className="px-4 md:px-5 py-3 max-w-[200px] truncate" style={{ color: '#43474f' }}>{row.notes ?? '—'}</td>
-                      <td className="px-4 md:px-5 py-3">
-                        <button style={{ color: '#405f91' }}><ExternalLink size={15} /></button>
-                      </td>
                     </tr>
                   );
                 })

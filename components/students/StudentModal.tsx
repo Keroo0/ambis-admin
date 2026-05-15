@@ -144,14 +144,18 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#43474f' }}>Kelas</label>
-            <select
+            <input
+              type="text"
+              list="class-options"
               value={studentClass}
               onChange={e => setStudentClass(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-[#006A63] bg-white"
+              className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-[#006A63]"
               style={{ borderColor: '#e0e3e5', color: '#191c1e' }}
-            >
-              {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+              placeholder="Pilih atau ketik kelas..."
+            />
+            <datalist id="class-options">
+              {CLASSES.map(c => <option key={c} value={c} />)}
+            </datalist>
           </div>
 
           {mode === 'add' && (

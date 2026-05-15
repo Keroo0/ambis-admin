@@ -76,9 +76,6 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = authData.user.id;
-
-  const passwordHash = createHash('sha256').update(password).digest('hex');
-
   const now = Date.now();
 
   const { error: userError } = await supabaseAdmin.from('users').insert({
@@ -88,7 +85,7 @@ export async function POST(req: NextRequest) {
     email,
     role: 'siswa',
     is_active: true,
-    password_hash: passwordHash,
+    password_hash: createHash('sha256').update(password).digest('hex'),
     created_at: now,
     updated_at: now,
   });
@@ -116,6 +113,23 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const user = await getAuthUser(req);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabaseAdmin = getAdminClient();
+
+  const { data: adminCheck } = await supabaseAdmin
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (adminCheck?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const body = await req.json() as { id?: string };
   const { id } = body;
 
@@ -123,10 +137,18 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'id wajib diisi' }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+  // Hapus dari Supabase Auth — abaikan jika tidak ada akun auth
+  // (siswa yang diinput langsung ke DB mungkin tidak punya akun auth)
+  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
+  if (authError && !authError.message.toLowerCase().includes('not found')) {
+    return NextResponse.json({ error: authError.message }, { status: 500 });
+  }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Hapus dari public.users — akan cascade ke students, attendance, grades,
+  // leave_requests, dan face_embeddings sesuai FK ON DELETE CASCADE
+  const { error: dbError } = await supabaseAdmin.from('users').delete().eq('id', id);
+  if (dbError) {
+    return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true }, { status: 200 });
