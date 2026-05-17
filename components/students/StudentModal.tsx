@@ -10,6 +10,7 @@ interface StudentRow {
   fullname: string;
   class: string;
   is_active: boolean;
+  homeroom_teacher?: string;
 }
 
 interface StudentModalProps {
@@ -28,12 +29,32 @@ const CLASSES = [
   'XII IPS 1', 'XII IPS 2', 'XII IPS 3',
 ];
 
+// ← Ganti dengan nama wali kelas asli untuk setiap tingkat
+const HOMEROOM_MAP: Record<string, string> = {
+  'X':   'Muhammad yusuf',
+  'XI':  'Zainal Arifin',
+  'XII': 'Ilham Fauzan',
+};
+
+function getAutoWaliKelas(className: string): string {
+  if (className.startsWith('XII')) return HOMEROOM_MAP['XII'];
+  if (className.startsWith('XI'))  return HOMEROOM_MAP['XI'];
+  if (className.startsWith('X'))   return HOMEROOM_MAP['X'];
+  return '';
+}
+
 export default function StudentModal({ mode, student, onClose, onSuccess }: StudentModalProps) {
   const [nisn, setNisn] = useState(student?.nisn ?? '');
   const [fullname, setFullname] = useState(student?.fullname ?? '');
   const [studentClass, setStudentClass] = useState(student?.class ?? CLASSES[0]);
   const [password, setPassword] = useState('');
   const [isActive, setIsActive] = useState(student?.is_active ?? true);
+  const [waliKelas, setWaliKelas] = useState(
+    mode === 'edit'
+      ? (student?.homeroom_teacher ?? '')
+      : getAutoWaliKelas(student?.class ?? CLASSES[0])
+  );
+  const [waliKelasManual, setWaliKelasManual] = useState(mode === 'edit');
   const [loading, setLoading] = useState(false);
   const [nisnError, setNisnError] = useState('');
   const [error, setError] = useState('');
@@ -63,6 +84,7 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
             fullname: fullname.trim(),
             class: studentClass,
             password,
+            homeroom_teacher: waliKelas.trim() || null,
           }),
         });
         const data = await res.json();
@@ -87,7 +109,7 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
 
       const { error: stuErr } = await supabase
         .from('students')
-        .update({ class: studentClass })
+        .update({ class: studentClass, homeroom_teacher: waliKelas.trim() || null })
         .eq('id', student.id);
 
       if (stuErr) { setError(stuErr.message); setLoading(false); return; }
@@ -148,7 +170,10 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
               type="text"
               list="class-options"
               value={studentClass}
-              onChange={e => setStudentClass(e.target.value)}
+              onChange={e => {
+                setStudentClass(e.target.value);
+                if (!waliKelasManual) setWaliKelas(getAutoWaliKelas(e.target.value));
+              }}
               className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-[#006A63]"
               style={{ borderColor: '#e0e3e5', color: '#191c1e' }}
               placeholder="Pilih atau ketik kelas..."
@@ -156,6 +181,21 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
             <datalist id="class-options">
               {CLASSES.map(c => <option key={c} value={c} />)}
             </datalist>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#43474f' }}>Wali Kelas</label>
+            <input
+              type="text"
+              value={waliKelas}
+              onChange={e => { setWaliKelasManual(true); setWaliKelas(e.target.value); }}
+              className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-[#006A63]"
+              style={{ borderColor: '#e0e3e5', color: '#191c1e' }}
+              placeholder="Nama wali kelas"
+            />
+            {!waliKelasManual && (
+              <p className="text-xs mt-1" style={{ color: '#747780' }}>Otomatis dari kelas — bisa diubah manual</p>
+            )}
           </div>
 
           {mode === 'add' && (

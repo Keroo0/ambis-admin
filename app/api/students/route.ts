@@ -39,9 +39,10 @@ export async function POST(req: NextRequest) {
     fullname: string;
     class: string;
     password: string;
+    homeroom_teacher?: string | null;
   };
 
-  const { nisn, fullname, class: studentClass, password } = body;
+  const { nisn, fullname, class: studentClass, password, homeroom_teacher } = body;
 
   if (!nisn?.trim() || !fullname?.trim() || !studentClass || !password) {
     return NextResponse.json({ error: 'Semua field wajib diisi' }, { status: 400 });
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
     id: userId,
     nisn: nisn.trim(),
     class: studentClass,
+    homeroom_teacher: homeroom_teacher ?? null,
     created_at: now,
     updated_at: now,
   });
