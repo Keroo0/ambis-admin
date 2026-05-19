@@ -524,11 +524,16 @@ Example measurable outcomes:
 23. ~~Notification preferences per-kategori~~ ✅
 24. ~~SQLite simplification (hanya face_embeddings)~~ ✅
 
----
+**Phase 6 — Bug Fix & Dashboard Ortu (2026-05-19):** ✅ SELESAI
+25. ~~Fix login ortu~~ ✅ — synthetic email `{nisn_anak}@ortu.sman07.local`, method `loginParent()`
+26. ~~Dashboard ortu expanded~~ ✅ — UTS+UAS side-by-side, absensi hari ini real-time, status izin
+27. ~~WA Bantuan IT~~ ✅ — tombol "Chat WhatsApp" 088297910157 di halaman Profil
 
 ---
 
-## ARSITEKTUR DATA (PER 2026-05-19)
+---
+
+## ARSITEKTUR DATA (UPDATED 2026-05-19 — Sesi 11)
 
 ### SQLite / Drift
 Hanya **satu tabel**: `face_embeddings`
@@ -554,7 +559,7 @@ Hanya **satu tabel**: `face_embeddings`
 | Role | Dibuat dari | Login |
 |---|---|---|
 | `siswa` | Admin web `/students` → Tambah Siswa | Flutter `/login` pakai NISN + password |
-| `ortu` | Admin web `/students` → centang "Tambahkan Akun Orang Tua" | Flutter `/parent-login` pakai email + password |
+| `ortu` | Admin web `/students` → centang "Tambahkan Akun Orang Tua" | Flutter `/parent-login` pakai **NISN anak** + password (synthetic email `{nisn_anak}@ortu.sman07.local`) |
 | `admin` | Manual di Supabase Auth | Web admin `/login` pakai email + password |
 
 ### Key Files Flutter (current)
@@ -562,10 +567,15 @@ Hanya **satu tabel**: `face_embeddings`
 |---|---|
 | `core/database/app_database.dart` | AppDatabase — hanya FaceEmbeddings |
 | `core/database/tables/face_embeddings.dart` | Satu-satunya Drift table |
+| `core/constants/app_constants.dart` | `authEmailDomain` + `authParentEmailDomain` |
 | `features/auth/data/models/user_entity.dart` | Plain Dart UserEntity (bukan Drift-generated) |
+| `features/auth/data/repositories/auth_repository.dart` | `login()` (siswa) + `loginParent()` (ortu) |
 | `features/attendance/data/repositories/attendance_repository.dart` | Write attendance ke Supabase |
 | `features/attendance/data/repositories/sync_repository.dart` | Hanya syncPendingFaceEmbeddings() |
 | `features/notifications/data/models/notification_preferences_model.dart` | Model preferensi notif |
+| `features/parent/data/repositories/parent_repository.dart` | Info anak, nilai UTS+UAS, absensi hari ini, izin |
+| `features/parent/presentation/providers/parent_provider.dart` | 6 provider untuk parent dashboard |
+| `features/profile/presentation/screens/profile_screen.dart` | Bantuan IT → WA 088297910157 |
 | `core/router/app_router.dart` | Seluruh routing + redirect logic |
 | `core/constants/colors.dart` | AppColors light + dark tokens |
 
