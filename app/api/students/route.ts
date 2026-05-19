@@ -46,9 +46,9 @@ export async function POST(req: NextRequest) {
     homeroom_teacher?: string | null;
     parent?: {
       fullname: string;
-      email: string;
       phone?: string;
       password: string;
+      // email omitted — generated as {nisn_siswa}@ortu.sman07.local for Supabase Auth
     };
   };
 
@@ -123,23 +123,13 @@ export async function POST(req: NextRequest) {
 
   // Handle parent account creation if requested
   if (body.parent) {
-    // Check if parent email is already taken
-    const { data: existingParent } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', body.parent.email.trim())
-      .maybeSingle();
-
-    if (existingParent) {
-      // Rollback student
-      await supabaseAdmin.auth.admin.deleteUser(userId);
-      await supabaseAdmin.from('users').delete().eq('id', userId);
-      return NextResponse.json({ error: 'Email orang tua sudah dipakai' }, { status: 409 });
-    }
+    // Synthetic email derived from student NISN — used for Supabase Auth.
+    // Parent logs in via Flutter with child's NISN + their own password.
+    const parentEmail = `${nisn.trim()}@ortu.sman07.local`;
 
     // Create auth user for parent
     const { data: parentAuth, error: parentAuthError } = await supabaseAdmin.auth.admin.createUser({
-      email: body.parent.email.trim(),
+      email: parentEmail,
       password: body.parent.password,
       email_confirm: true,
     });
@@ -158,7 +148,7 @@ export async function POST(req: NextRequest) {
       id: parentId,
       nisn: `PARENT-${parentId.slice(0, 8)}`,
       fullname: body.parent.fullname.trim(),
-      email: body.parent.email.trim(),
+      email: parentEmail,
       phone: body.parent.phone?.trim() ?? null,
       role: 'ortu',
       is_active: true,

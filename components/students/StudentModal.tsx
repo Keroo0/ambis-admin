@@ -63,7 +63,6 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
   const [addParent, setAddParent] = useState(false);
   const [parentForm, setParentForm] = useState({
     fullname: '',
-    email: '',
     phone: '',
     password: '',
   });
@@ -87,10 +86,6 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
         setError('Nama lengkap orang tua wajib diisi');
         return;
       }
-      if (!parentForm.email.trim()) {
-        setError('Email orang tua wajib diisi');
-        return;
-      }
       if (parentForm.password.length < 6) {
         setError('Password sementara orang tua minimal 6 karakter');
         return;
@@ -112,9 +107,9 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
         if (addParent) {
           bodyPayload.parent = {
             fullname: parentForm.fullname.trim(),
-            email: parentForm.email.trim(),
             phone: parentForm.phone.trim() || undefined,
             password: parentForm.password,
+            // email omitted — backend generates {nisn}@ortu.sman07.local
           };
         }
 
@@ -321,20 +316,6 @@ export default function StudentModal({ mode, student, onClose, onSuccess }: Stud
                           className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-[#006A63]"
                           style={{ borderColor: '#e0e3e5', color: '#191c1e' }}
                           placeholder="Nama lengkap orang tua"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#43474f' }}>
-                          Email Orang Tua <span style={{ color: '#ba1a1a' }}>*</span>
-                        </label>
-                        <input
-                          type="email"
-                          value={parentForm.email}
-                          onChange={e => setParentForm(p => ({ ...p, email: e.target.value }))}
-                          className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-[#006A63]"
-                          style={{ borderColor: '#e0e3e5', color: '#191c1e' }}
-                          placeholder="email@contoh.com"
                         />
                       </div>
 
