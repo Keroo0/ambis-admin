@@ -14,6 +14,8 @@ interface StudentRow {
   class: string;
   is_active: boolean;
   has_face: boolean;
+  parent_id: string | null;
+  parent: { fullname: string; phone?: string } | null;
 }
 
 const AVATAR_COLORS = [
@@ -83,7 +85,7 @@ export default function StudentsPage() {
 
     let query = supabase
       .from('users')
-      .select('id, nisn, fullname, is_active, students!students_id_fkey!inner(class, face_embeddings!face_embeddings_student_id_fkey(id))', { count: 'exact' })
+      .select('id, nisn, fullname, is_active, students!students_id_fkey!inner(class, parent_id, face_embeddings!face_embeddings_student_id_fkey(id), parent:parent_id(fullname, phone))', { count: 'exact' })
       .eq('role', 'siswa')
       .order('fullname')
       .range(from, to);
@@ -107,6 +109,7 @@ export default function StudentsPage() {
       setStudents(data.map((u: Record<string, unknown>) => {
         const stu = u.students as Record<string, unknown> | null;
         const faces = stu?.face_embeddings as unknown[];
+        const parentRaw = stu?.parent as Record<string, string> | null;
         return {
           id: u.id as string,
           nisn: u.nisn as string,
@@ -114,6 +117,8 @@ export default function StudentsPage() {
           is_active: u.is_active as boolean,
           class: (stu?.class as string) ?? '—',
           has_face: Array.isArray(faces) ? faces.length > 0 : !!stu?.face_embeddings,
+          parent_id: (stu?.parent_id as string) ?? null,
+          parent: parentRaw ? { fullname: parentRaw.fullname, phone: parentRaw.phone } : null,
         };
       }));
     }
@@ -200,18 +205,18 @@ export default function StudentsPage() {
           <table className="w-full text-sm min-w-[500px]">
             <thead>
               <tr style={{ backgroundColor: '#f7f9fb' }}>
-                {['Name', 'NISN', 'Class', 'Account Status', 'Actions'].map((h) => (
+                {['Name', 'NISN', 'Class', 'Orang Tua', 'Account Status', 'Actions'].map((h) => (
                   <th key={h} className="px-4 md:px-5 py-3 text-left text-xs font-semibold whitespace-nowrap" style={{ color: '#43474f' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
+                <tr><td colSpan={6} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
               ) : loadError ? (
-                <tr><td colSpan={5} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#ba1a1a' }}>{loadError}</td></tr>
+                <tr><td colSpan={6} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#ba1a1a' }}>{loadError}</td></tr>
               ) : students.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Tidak ada siswa ditemukan</td></tr>
+                <tr><td colSpan={6} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>Tidak ada siswa ditemukan</td></tr>
               ) : students.map((s) => (
                 <tr key={s.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
                   <td className="px-4 md:px-5 py-3">
@@ -225,6 +230,13 @@ export default function StudentsPage() {
                   </td>
                   <td className="px-4 md:px-5 py-3 whitespace-nowrap" style={{ color: '#43474f' }}>{s.nisn}</td>
                   <td className="px-4 md:px-5 py-3 whitespace-nowrap" style={{ color: '#43474f' }}>{s.class}</td>
+                  <td className="px-4 md:px-5 py-3 whitespace-nowrap">
+                    {s.parent ? (
+                      <span className="text-xs font-medium" style={{ color: '#007169' }}>{s.parent.fullname}</span>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full border" style={{ borderColor: '#e0e3e5', color: '#747780' }}>Belum ditautkan</span>
+                    )}
+                  </td>
                   <td className="px-4 md:px-5 py-3"><StatusBadge isActive={s.is_active} hasFace={s.has_face} /></td>
                   <td className="px-4 md:px-5 py-3">
                     <div className="flex items-center gap-1">

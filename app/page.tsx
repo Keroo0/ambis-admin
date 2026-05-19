@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Users, CalendarCheck, AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import GeofenceSection from '@/components/dashboard/GeofenceSection';
 import AttendanceTimeSection from '@/components/dashboard/AttendanceTimeSection';
@@ -16,12 +17,27 @@ interface AbsenceRow {
   student?: { fullname: string; class: string } | null;
 }
 
+interface ClassAverage {
+  class: string;
+  avg: number;
+}
+
+interface RecentGradeRow {
+  subject: string;
+  type: string;
+  score: number;
+  created_at: number;
+  studentName: string;
+}
+
 export default function DashboardPage() {
   const [totalStudents, setTotalStudents] = useState<number | null>(null);
   const [attendanceRate, setAttendanceRate] = useState<number | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<number | null>(null);
   const [absences, setAbsences] = useState<AbsenceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [classAverages, setClassAverages] = useState<ClassAverage[]>([]);
+  const [recentGrades, setRecentGrades] = useState<RecentGradeRow[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -70,6 +86,58 @@ export default function DashboardPage() {
     load();
   }, []);
 
+  // Fetch grades summary separately
+  useEffect(() => {
+    async function loadGrades() {
+      const [gradesPerClassRes, recentGradesRes] = await Promise.all([
+        supabase
+          .from('grades')
+          .select('score, students!student_id(class)'),
+        supabase
+          .from('grades')
+          .select('subject, type, score, created_at, students!student_id(users!id(fullname))')
+          .order('created_at', { ascending: false })
+          .limit(5),
+      ]);
+
+      // Compute class averages
+      if (gradesPerClassRes.data) {
+        const acc: Record<string, { sum: number; count: number }> = {};
+        (gradesPerClassRes.data as unknown as { score: number; students: { class: string } | null }[])
+          .forEach((row) => {
+            const cls = row.students?.class ?? 'Unknown';
+            if (!acc[cls]) acc[cls] = { sum: 0, count: 0 };
+            acc[cls].sum += row.score;
+            acc[cls].count += 1;
+          });
+        const averages = Object.entries(acc)
+          .map(([cls, { sum, count }]) => ({ class: cls, avg: sum / count }))
+          .sort((a, b) => b.avg - a.avg)
+          .slice(0, 5);
+        setClassAverages(averages);
+      }
+
+      // Map recent grades
+      if (recentGradesRes.data) {
+        const rows = (recentGradesRes.data as unknown as {
+          subject: string;
+          type: string;
+          score: number;
+          created_at: number;
+          students: { users: { fullname: string } | null } | null;
+        }[]).map((g) => ({
+          subject: g.subject,
+          type: g.type,
+          score: g.score,
+          created_at: g.created_at,
+          studentName: g.students?.users?.fullname ?? '—',
+        }));
+        setRecentGrades(rows);
+      }
+    }
+    loadGrades();
+  }, []);
+
   const statusLabel = (status: string) => {
     if (status === 'sick') return { label: 'Sakit', bg: '#ffdf9e', color: '#5b4300' };
     if (status === 'leave') return { label: 'Izin', bg: '#d8f5f3', color: '#00504a' };
@@ -85,9 +153,34 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-6">
-        <StatCard title="TOTAL STUDENTS" value={loading ? '—' : (totalStudents ?? 0).toLocaleString()} sub="+12 from last semester" icon={<Users size={18} />} iconBg="#d6e3ff" iconColor="#264778" />
-        <StatCard title="ATTENDANCE RATE" value={loading ? '—' : `${attendanceRate ?? 0}%`} sub="Above target (95%)" icon={<CalendarCheck size={18} />} iconBg="#d8f5f3" iconColor="#007169" />
-        <StatCard title="PENDING APPROVALS" value={loading ? '—' : String(pendingApprovals ?? 0)} sub="Requires attention today" icon={<AlertCircle size={18} />} iconBg="#ffdad6" iconColor="#ba1a1a" valueColor="#ba1a1a" />
+        <StatCard
+          title="TOTAL STUDENTS"
+          value={loading ? '—' : (totalStudents ?? 0).toLocaleString()}
+          sub="+12 from last semester"
+          icon={<Users size={18} />}
+          iconBg="#d6e3ff"
+          iconColor="#264778"
+          delay={0}
+        />
+        <StatCard
+          title="ATTENDANCE RATE"
+          value={loading ? '—' : `${attendanceRate ?? 0}%`}
+          sub="Above target (95%)"
+          icon={<CalendarCheck size={18} />}
+          iconBg="#d8f5f3"
+          iconColor="#007169"
+          delay={0.05}
+        />
+        <StatCard
+          title="PENDING APPROVALS"
+          value={loading ? '—' : String(pendingApprovals ?? 0)}
+          sub="Requires attention today"
+          icon={<AlertCircle size={18} />}
+          iconBg="#ffdad6"
+          iconColor="#ba1a1a"
+          valueColor="#ba1a1a"
+          delay={0.1}
+        />
       </div>
 
       <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
@@ -129,24 +222,82 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Ringkasan Nilai */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 mt-6">
+        {/* Card kiri: Rata-rata Nilai per Kelas */}
+        <div className="rounded-xl border border-[#e0e3e5] bg-white p-5">
+          <h3 className="text-xs font-semibold tracking-widest text-[#43474f] uppercase mb-4">
+            Rata-rata Nilai per Kelas
+          </h3>
+          {classAverages.length === 0 ? (
+            <p className="text-sm text-[#747780]">Belum ada data nilai.</p>
+          ) : (
+            <ul className="space-y-2">
+              {classAverages.map(({ class: cls, avg }) => (
+                <li key={cls} className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-[#191c1e]">{cls}</span>
+                  <span className={`font-semibold ${avg >= 75 ? 'text-[#006A63]' : 'text-[#BA1A1A]'}`}>
+                    {avg.toFixed(1)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Card kanan: Input Nilai Terbaru */}
+        <div className="rounded-xl border border-[#e0e3e5] bg-white p-5">
+          <h3 className="text-xs font-semibold tracking-widest text-[#43474f] uppercase mb-4">
+            Input Nilai Terbaru
+          </h3>
+          {recentGrades.length === 0 ? (
+            <p className="text-sm text-[#747780]">Belum ada data nilai terbaru.</p>
+          ) : (
+            <ul className="space-y-2.5">
+              {recentGrades.map((g, i) => (
+                <li key={i} className="flex items-center justify-between text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-[#191c1e] truncate">{g.studentName}</p>
+                    <p className="text-xs text-[#747780]">{g.subject} · {g.type}</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                    <span className={`font-semibold text-sm ${g.score >= 75 ? 'text-[#006A63]' : 'text-[#BA1A1A]'}`}>
+                      {g.score}
+                    </span>
+                    <span className="text-xs text-[#747780]">
+                      {new Date(g.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
       <AttendanceTimeSection />
       <GeofenceSection />
     </div>
   );
 }
 
-function StatCard({ title, value, sub, icon, iconBg, iconColor, valueColor }: {
+function StatCard({ title, value, sub, icon, iconBg, iconColor, valueColor, delay = 0 }: {
   title: string; value: string; sub: string; icon: React.ReactNode;
-  iconBg: string; iconColor: string; valueColor?: string;
+  iconBg: string; iconColor: string; valueColor?: string; delay?: number;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-[#e0e3e5] p-4 md:p-5">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.4, ease: 'easeOut' }}
+      className="bg-white rounded-xl border border-[#e0e3e5] p-4 md:p-5"
+    >
       <div className="flex items-start justify-between mb-3">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#43474f' }}>{title}</p>
         <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: iconBg, color: iconColor }}>{icon}</div>
       </div>
       <p className="text-2xl md:text-3xl font-bold mb-1" style={{ color: valueColor ?? '#191c1e' }}>{value}</p>
       <p className="text-xs" style={{ color: '#747780' }}>{sub}</p>
-    </div>
+    </motion.div>
   );
 }

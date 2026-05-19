@@ -1,23 +1,24 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Save, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Save, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
-interface StudentRow {
+interface StudentItem {
   id: string;
   nisn: string;
   fullname: string;
 }
 
-interface GradeEntry {
+type SubjectEntry = {
   uts: string;
   uas: string;
-  utsId: string | null;
-  uasId: string | null;
-  status: 'saved' | 'pending' | 'editing';
-}
+  status: 'empty' | 'editing' | 'saved';
+  utsId?: string;
+  uasId?: string;
+};
 
 const SUBJECTS = [
   'Matematika',
@@ -34,18 +35,16 @@ const SUBJECTS = [
 
 const YEAR = new Date().getFullYear();
 const ACADEMIC_YEARS = [`${YEAR - 1}/${YEAR}`, `${YEAR}/${YEAR + 1}`];
-const PAGE_SIZE = 10;
 
 export default function GradesPage() {
   const [academicYear, setAcademicYear] = useState(ACADEMIC_YEARS[0]);
   const [semester, setSemester] = useState(1);
   const [selectedClass, setSelectedClass] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState(SUBJECTS[0]);
   const [classes, setClasses] = useState<string[]>([]);
-  const [students, setStudents] = useState<StudentRow[]>([]);
-  const [grades, setGrades] = useState<Record<string, GradeEntry>>({});
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [studentList, setStudentList] = useState<StudentItem[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState('');
+  const [studentIdx, setStudentIdx] = useState(0);
+  const [entries, setEntries] = useState<Record<string, SubjectEntry>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -56,6 +55,7 @@ export default function GradesPage() {
     supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
   }, []);
 
+  // Load available classes
   useEffect(() => {
     supabase
       .from('students')
@@ -69,72 +69,66 @@ export default function GradesPage() {
       });
   }, []);
 
-  const loadStudentsAndGrades = useCallback(async () => {
+  // Load students when class changes
+  useEffect(() => {
     if (!selectedClass) return;
-    setLoading(true);
-
-    const year = parseInt(academicYear.split('/')[0]);
-    const from = (page - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-
-    const { data: stuData, count } = await supabase
+    supabase
       .from('students')
-      .select('id, nisn, class, users!students_id_fkey(fullname)', { count: 'exact' })
+      .select('id, nisn, users!students_id_fkey(fullname)')
       .eq('class', selectedClass)
       .order('nisn')
-      .range(from, to);
+      .then(({ data }) => {
+        const list = (data ?? []).map((s: Record<string, unknown>) => ({
+          id: s.id as string,
+          nisn: s.nisn as string,
+          fullname: ((s.users as Record<string, string> | null)?.fullname) ?? '-',
+        }));
+        setStudentList(list);
+        setStudentIdx(0);
+        if (list.length > 0) setSelectedStudent(list[0].id);
+        else setSelectedStudent('');
+      });
+  }, [selectedClass]);
 
-    setTotal(count ?? 0);
+  // Load grades when student/semester/year changes
+  const year = parseInt(academicYear.split('/')[0]);
 
-    if (!stuData) { setLoading(false); return; }
-
-    const rows: StudentRow[] = stuData.map((s: Record<string, unknown>) => {
-      const u = s.users as Record<string, string> | null;
-      return {
-        id: s.id as string,
-        nisn: s.nisn as string,
-        fullname: u?.fullname ?? '-',
-      };
-    });
-    setStudents(rows);
-
-    const ids = rows.map((r) => r.id);
-    if (ids.length === 0) { setGrades({}); setLoading(false); return; }
-
-    const { data: gradeData } = await supabase
+  const loadGrades = useCallback(async () => {
+    if (!selectedStudent) {
+      setEntries({});
+      return;
+    }
+    setLoading(true);
+    const { data } = await supabase
       .from('grades')
-      .select('id, student_id, type, score')
-      .in('student_id', ids)
-      .eq('subject', selectedSubject)
+      .select('id, subject, type, score')
+      .eq('student_id', selectedStudent)
       .eq('semester', semester)
       .eq('year', year);
 
-    const map: Record<string, GradeEntry> = {};
-    rows.forEach((s) => {
-      map[s.id] = { uts: '', uas: '', utsId: null, uasId: null, status: 'pending' };
+    const newEntries: Record<string, SubjectEntry> = {};
+    SUBJECTS.forEach((subj) => {
+      const uts = data?.find((g: Record<string, unknown>) => g.subject === subj && g.type === 'UTS');
+      const uas = data?.find((g: Record<string, unknown>) => g.subject === subj && g.type === 'UAS');
+      newEntries[subj] = {
+        uts: uts ? String(uts.score) : '',
+        uas: uas ? String(uas.score) : '',
+        status: (uts || uas) ? 'saved' : 'empty',
+        utsId: (uts?.id as string) ?? undefined,
+        uasId: (uas?.id as string) ?? undefined,
+      };
     });
-    if (gradeData) {
-      gradeData.forEach((g: Record<string, unknown>) => {
-        if (!map[g.student_id as string]) return;
-        if (g.type === 'UTS') { map[g.student_id as string].uts = String(g.score); map[g.student_id as string].utsId = g.id as string; }
-        if (g.type === 'UAS') { map[g.student_id as string].uas = String(g.score); map[g.student_id as string].uasId = g.id as string; }
-      });
-      rows.forEach((s) => {
-        const e = map[s.id];
-        if (e.uts || e.uas) e.status = 'saved';
-      });
-    }
-    setGrades(map);
+    setEntries(newEntries);
     setLoading(false);
-  }, [selectedClass, selectedSubject, semester, academicYear, page]);
+  }, [selectedStudent, semester, year]);
 
-  useEffect(() => { loadStudentsAndGrades(); }, [loadStudentsAndGrades]);
+  useEffect(() => { loadGrades(); }, [loadGrades]);
 
-  function handleChange(studentId: string, field: 'uts' | 'uas', value: string) {
+  function handleChange(subj: string, field: 'uts' | 'uas', value: string) {
     if (value !== '' && (isNaN(Number(value)) || Number(value) < 0 || Number(value) > 100)) return;
-    setGrades((prev) => ({
+    setEntries((prev) => ({
       ...prev,
-      [studentId]: { ...prev[studentId], [field]: value, status: 'editing' },
+      [subj]: { ...prev[subj], [field]: value, status: 'editing' },
     }));
   }
 
@@ -142,42 +136,42 @@ export default function GradesPage() {
     setSaving(true);
     setSaveSuccess(false);
     setSaveError('');
-    const year = parseInt(academicYear.split('/')[0]);
     const now = Date.now();
-    const upserts: object[] = [];
+    const rows: object[] = [];
 
-    Object.entries(grades).forEach(([studentId, entry]) => {
-      if (entry.status !== 'editing') return;
-      if (entry.uts !== '') {
-        upserts.push({
-          id: entry.utsId ?? uuidv4(),
-          student_id: studentId,
-          subject: selectedSubject,
+    for (const subj of SUBJECTS) {
+      const e = entries[subj];
+      if (!e || e.status !== 'editing') continue;
+      if (e.uts !== '') {
+        rows.push({
+          id: e.utsId ?? uuidv4(),
+          student_id: selectedStudent,
+          subject: subj,
           type: 'UTS',
-          score: parseFloat(entry.uts),
+          score: parseFloat(e.uts),
           semester,
           year,
-          ...(entry.utsId ? {} : { created_at: now }),
+          created_at: now,
           updated_at: now,
         });
       }
-      if (entry.uas !== '') {
-        upserts.push({
-          id: entry.uasId ?? uuidv4(),
-          student_id: studentId,
-          subject: selectedSubject,
+      if (e.uas !== '') {
+        rows.push({
+          id: e.uasId ?? uuidv4(),
+          student_id: selectedStudent,
+          subject: subj,
           type: 'UAS',
-          score: parseFloat(entry.uas),
+          score: parseFloat(e.uas),
           semester,
           year,
-          ...(entry.uasId ? {} : { created_at: now }),
+          created_at: now,
           updated_at: now,
         });
       }
-    });
+    }
 
-    if (upserts.length > 0) {
-      const { error: upsertErr } = await supabase.from('grades').upsert(upserts, { onConflict: 'id' });
+    if (rows.length > 0) {
+      const { error: upsertErr } = await supabase.from('grades').upsert(rows, { onConflict: 'id' });
       if (upsertErr) {
         setSaveError(`Gagal menyimpan: ${upsertErr.message}`);
         setSaving(false);
@@ -185,7 +179,7 @@ export default function GradesPage() {
       }
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const auditRows = upserts.map((u: any) => ({
+        const auditRows = rows.map((u: any) => ({
           admin_id: adminId,
           action: 'update_grade',
           entity_type: 'grade',
@@ -197,14 +191,29 @@ export default function GradesPage() {
         await supabase.from('audit_log').insert(auditRows);
       } catch (_) { /* non-blocking */ }
     }
-    await loadStudentsAndGrades();
+
+    await loadGrades();
     setSaving(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   }
 
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-  const hasEdits = Object.values(grades).some((e) => e.status === 'editing');
+  function prevStudent() {
+    if (studentIdx <= 0) return;
+    const newIdx = studentIdx - 1;
+    setStudentIdx(newIdx);
+    setSelectedStudent(studentList[newIdx].id);
+  }
+
+  function nextStudent() {
+    if (studentIdx >= studentList.length - 1) return;
+    const newIdx = studentIdx + 1;
+    setStudentIdx(newIdx);
+    setSelectedStudent(studentList[newIdx].id);
+  }
+
+  const selectedStudentData = studentList[studentIdx] ?? null;
+  const hasEdits = Object.values(entries).some((e) => e.status === 'editing');
 
   return (
     <div>
@@ -212,7 +221,7 @@ export default function GradesPage() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#191c1e' }}>Input Nilai</h1>
           <p className="text-xs md:text-sm mt-1" style={{ color: '#43474f' }}>
-            Pilih kelas dan mata pelajaran untuk mengisi nilai UTS dan UAS.
+            Pilih kelas dan siswa untuk mengisi nilai UTS dan UAS semua mata pelajaran.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -227,7 +236,7 @@ export default function GradesPage() {
             </span>
           )}
           <button
-            onClick={() => loadStudentsAndGrades()}
+            onClick={loadGrades}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-[#f7f9fb] disabled:opacity-50"
             style={{ borderColor: '#e0e3e5', color: '#43474f' }}
@@ -246,6 +255,7 @@ export default function GradesPage() {
         </div>
       </div>
 
+      {/* Filters */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
         <div>
           <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: '#43474f' }}>
@@ -254,7 +264,7 @@ export default function GradesPage() {
           <div className="flex gap-2">
             <select
               value={academicYear}
-              onChange={(e) => { setAcademicYear(e.target.value); setPage(1); }}
+              onChange={(e) => setAcademicYear(e.target.value)}
               className="flex-1 px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-[#264778]"
               style={{ borderColor: '#e0e3e5', color: '#43474f' }}
             >
@@ -262,7 +272,7 @@ export default function GradesPage() {
             </select>
             <select
               value={semester}
-              onChange={(e) => { setSemester(Number(e.target.value)); setPage(1); }}
+              onChange={(e) => setSemester(Number(e.target.value))}
               className="w-28 px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-[#264778]"
               style={{ borderColor: '#e0e3e5', color: '#43474f' }}
             >
@@ -278,7 +288,7 @@ export default function GradesPage() {
           </label>
           <select
             value={selectedClass}
-            onChange={(e) => { setSelectedClass(e.target.value); setPage(1); }}
+            onChange={(e) => setSelectedClass(e.target.value)}
             className="w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-[#264778]"
             style={{ borderColor: '#e0e3e5', color: '#43474f' }}
           >
@@ -289,161 +299,136 @@ export default function GradesPage() {
 
         <div>
           <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: '#43474f' }}>
-            Mata Pelajaran
+            Siswa
           </label>
-          <input
-            type="text"
-            list="subject-options"
-            value={selectedSubject}
-            onChange={(e) => { setSelectedSubject(e.target.value); setPage(1); }}
+          <select
+            value={selectedStudent}
+            onChange={(e) => {
+              const idx = studentList.findIndex(s => s.id === e.target.value);
+              setStudentIdx(idx >= 0 ? idx : 0);
+              setSelectedStudent(e.target.value);
+            }}
             className="w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-[#264778]"
             style={{ borderColor: '#e0e3e5', color: '#43474f' }}
-            placeholder="Pilih atau ketik mata pelajaran..."
-          />
-          <datalist id="subject-options">
-            {SUBJECTS.map((s) => <option key={s} value={s} />)}
-          </datalist>
+          >
+            {studentList.length === 0 && <option value="">Pilih kelas terlebih dahulu</option>}
+            {studentList.map((s) => (
+              <option key={s.id} value={s.id}>{s.fullname} ({s.nisn})</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[600px]">
-            <thead>
-              <tr style={{ backgroundColor: '#001736' }}>
-                {['No', 'NISN', 'Nama Siswa', 'Nilai UTS', 'Nilai UAS', 'Status'].map((h) => (
-                  <th key={h} className="px-4 md:px-5 py-3 text-left text-xs font-semibold text-white whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>
-                    Memuat data...
-                  </td>
-                </tr>
-              ) : students.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 md:px-5 py-10 text-center text-sm" style={{ color: '#747780' }}>
-                    {selectedClass ? 'Tidak ada siswa di kelas ini.' : 'Pilih kelas untuk menampilkan siswa.'}
-                  </td>
-                </tr>
-              ) : (
-                students.map((s, i) => {
-                  const entry = grades[s.id] ?? { uts: '', uas: '', utsId: null, uasId: null, status: 'pending' as const };
-                  return (
-                    <tr key={s.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
-                      <td className="px-4 md:px-5 py-3 text-xs" style={{ color: '#747780' }}>
-                        {(page - 1) * PAGE_SIZE + i + 1}
-                      </td>
-                      <td className="px-4 md:px-5 py-3 whitespace-nowrap" style={{ color: '#43474f' }}>{s.nisn}</td>
-                      <td className="px-4 md:px-5 py-3 font-medium whitespace-nowrap" style={{ color: '#191c1e' }}>{s.fullname}</td>
-                      <td className="px-4 md:px-5 py-3">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={0.1}
-                          value={entry.uts}
-                          onChange={(e) => handleChange(s.id, 'uts', e.target.value)}
-                          placeholder="—"
-                          className="w-20 px-2.5 py-1.5 text-sm rounded-lg border text-center outline-none focus:ring-2 focus:ring-[#264778]"
-                          style={{
-                            borderColor: entry.status === 'editing' ? '#405f91' : '#e0e3e5',
-                            backgroundColor: entry.status === 'editing' ? '#f0f4ff' : '#ffffff',
-                          }}
-                        />
-                      </td>
-                      <td className="px-4 md:px-5 py-3">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={0.1}
-                          value={entry.uas}
-                          onChange={(e) => handleChange(s.id, 'uas', e.target.value)}
-                          placeholder="—"
-                          className="w-20 px-2.5 py-1.5 text-sm rounded-lg border text-center outline-none focus:ring-2 focus:ring-[#264778]"
-                          style={{
-                            borderColor: entry.status === 'editing' ? '#405f91' : '#e0e3e5',
-                            backgroundColor: entry.status === 'editing' ? '#f0f4ff' : '#ffffff',
-                          }}
-                        />
-                      </td>
-                      <td className="px-4 md:px-5 py-3">
-                        <StatusBadge status={entry.status} />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {total > 0 && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mt-4">
-          <p className="text-xs" style={{ color: '#747780' }}>
-            Menampilkan {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} dari {total} siswa
-          </p>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-1.5 rounded-lg disabled:opacity-40 hover:bg-[#f2f4f6]"
-                style={{ color: '#43474f' }}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const p = page <= 3 ? i + 1 : page - 2 + i;
-                if (p < 1 || p > totalPages) return null;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    className="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
-                    style={{
-                      backgroundColor: p === page ? '#001736' : 'transparent',
-                      color: p === page ? '#fff' : '#43474f',
-                    }}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-              {totalPages > 5 && page < totalPages - 2 && (
-                <span className="px-1 text-xs" style={{ color: '#747780' }}>...</span>
-              )}
-              {totalPages > 5 && page < totalPages - 2 && (
-                <button
-                  onClick={() => setPage(totalPages)}
-                  className="w-8 h-8 rounded-lg text-sm font-medium hover:bg-[#f2f4f6]"
-                  style={{ color: '#43474f' }}
-                >
-                  {totalPages}
-                </button>
-              )}
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-1.5 rounded-lg disabled:opacity-40 hover:bg-[#f2f4f6]"
-                style={{ color: '#43474f' }}
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          )}
+      {/* Student navigation */}
+      {studentList.length > 0 && (
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={prevStudent}
+            disabled={studentIdx === 0}
+            className="px-3 py-1 text-sm rounded border disabled:opacity-40 hover:bg-[#f7f9fb] transition-colors"
+            style={{ borderColor: '#e0e3e5', color: '#43474f' }}
+          >
+            ← Sebelumnya
+          </button>
+          <span className="text-sm font-medium text-[#191c1e]">
+            {selectedStudentData?.fullname ?? '-'} ({selectedStudentData?.nisn ?? '-'})
+          </span>
+          <button
+            onClick={nextStudent}
+            disabled={studentIdx >= studentList.length - 1}
+            className="px-3 py-1 text-sm rounded border disabled:opacity-40 hover:bg-[#f7f9fb] transition-colors"
+            style={{ borderColor: '#e0e3e5', color: '#43474f' }}
+          >
+            Berikutnya →
+          </button>
+          <span className="text-xs ml-1" style={{ color: '#747780' }}>
+            {studentIdx + 1} / {studentList.length}
+          </span>
         </div>
       )}
+
+      {/* Table with fade animation per student */}
+      <motion.div
+        key={selectedStudent}
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.25 }}
+      >
+        <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ backgroundColor: '#001736' }}>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-white">No</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-white">Mata Pelajaran</th>
+                  <th className="py-3 px-4 text-center text-xs font-semibold text-white">Nilai UTS</th>
+                  <th className="py-3 px-4 text-center text-xs font-semibold text-white">Nilai UAS</th>
+                  <th className="py-3 px-4 text-center text-xs font-semibold text-white">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm" style={{ color: '#747780' }}>
+                      Memuat data...
+                    </td>
+                  </tr>
+                ) : !selectedStudent ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm" style={{ color: '#747780' }}>
+                      Pilih kelas dan siswa untuk menampilkan nilai.
+                    </td>
+                  </tr>
+                ) : (
+                  SUBJECTS.map((subj, i) => {
+                    const e = entries[subj] ?? { uts: '', uas: '', status: 'empty' as const };
+                    return (
+                      <tr key={subj} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f7f9fb]'}>
+                        <td className="py-3 px-4 text-[#43474f]">{i + 1}</td>
+                        <td className="py-3 px-4 font-medium text-[#191c1e]">{subj}</td>
+                        <td className="py-3 px-4 text-center">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.1}
+                            value={e.uts}
+                            onChange={(ev) => handleChange(subj, 'uts', ev.target.value)}
+                            placeholder="—"
+                            className="w-20 rounded border px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-[#264778]"
+                            style={{ borderColor: e.status === 'editing' ? '#405f91' : '#e0e3e5' }}
+                          />
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.1}
+                            value={e.uas}
+                            onChange={(ev) => handleChange(subj, 'uas', ev.target.value)}
+                            placeholder="—"
+                            className="w-20 rounded border px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-[#264778]"
+                            style={{ borderColor: e.status === 'editing' ? '#405f91' : '#e0e3e5' }}
+                          />
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <StatusBadge status={e.status} />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: GradeEntry['status'] }) {
+function StatusBadge({ status }: { status: SubjectEntry['status'] }) {
   if (status === 'saved') return (
     <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#d8f5f3', color: '#007169' }}>
       ✓ Tersimpan

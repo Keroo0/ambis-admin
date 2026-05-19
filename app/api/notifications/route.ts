@@ -13,6 +13,8 @@ function getAdminClient() {
   });
 }
 
+type NotificationType = 'attendance' | 'grade' | 'leave' | 'announcement' | 'system';
+
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,12 +29,14 @@ export async function POST(req: NextRequest) {
   const body = await req.json() as {
     title: string;
     body: string;
+    type?: NotificationType;
     target: 'all' | 'class' | 'student';
     class?: string;
     student_id?: string;
   };
 
   const { title, body: msgBody, target } = body;
+  const type: NotificationType = body.type ?? 'announcement';
 
   if (!title?.trim() || !msgBody?.trim())
     return NextResponse.json({ error: 'Judul dan isi notifikasi wajib diisi' }, { status: 400 });
@@ -54,10 +58,27 @@ export async function POST(req: NextRequest) {
   if (userIds.length === 0)
     return NextResponse.json({ error: 'Tidak ada siswa untuk target tersebut' }, { status: 400 });
 
+  // Filter out users who have disabled this notification type in their preferences
+  const { data: prefs } = await supabaseAdmin
+    .from('notification_preferences')
+    .select('user_id, attendance, grade, leave, announcement, system')
+    .in('user_id', userIds);
+
+  const disabledUsers = new Set(
+    (prefs ?? [])
+      .filter((p: Record<string, unknown>) => p[type] === false)
+      .map((p: { user_id: string }) => p.user_id)
+  );
+
+  const filteredUserIds = userIds.filter((uid: string) => !disabledUsers.has(uid));
+
+  if (filteredUserIds.length === 0)
+    return NextResponse.json({ sent: 0, message: 'Semua pengguna menonaktifkan tipe notifikasi ini' });
+
   const now = new Date().toISOString();
-  const notifications = userIds.map(uid => ({
+  const notifications = filteredUserIds.map(uid => ({
     user_id: uid,
-    type: 'announcement',
+    type,
     title: title.trim(),
     body: msgBody.trim(),
     is_read: false,
@@ -67,5 +88,5 @@ export async function POST(req: NextRequest) {
   const { error } = await supabaseAdmin.from('notifications').insert(notifications);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ sent: userIds.length });
+  return NextResponse.json({ sent: filteredUserIds.length });
 }
