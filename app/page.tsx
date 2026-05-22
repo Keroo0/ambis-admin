@@ -1,19 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users, CalendarCheck, AlertCircle } from 'lucide-react';
+import { Users, CalendarCheck, AlertCircle, Radio } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import GeofenceSection from '@/components/dashboard/GeofenceSection';
 import AttendanceTimeSection from '@/components/dashboard/AttendanceTimeSection';
 
-interface AbsenceRow {
+interface AttendanceRow {
   id: string;
   student_id: string;
   date: string;
   status: string;
   notes: string | null;
+  time_in: string | null;
+  time_out: string | null;
   student?: { fullname: string; class: string } | null;
 }
 
@@ -34,57 +36,83 @@ export default function DashboardPage() {
   const [totalStudents, setTotalStudents] = useState<number | null>(null);
   const [attendanceRate, setAttendanceRate] = useState<number | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<number | null>(null);
-  const [absences, setAbsences] = useState<AbsenceRow[]>([]);
+  const [todayAttendance, setTodayAttendance] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [liveTick, setLiveTick] = useState(false);
   const [classAverages, setClassAverages] = useState<ClassAverage[]>([]);
   const [recentGrades, setRecentGrades] = useState<RecentGradeRow[]>([]);
 
-  useEffect(() => {
-    async function load() {
-      const today = new Date().toISOString().split('T')[0];
+  const loadAttendance = useCallback(async () => {
+    const today = new Date().toISOString().split('T')[0];
 
-      const [studentsRes, pendingRes, attendanceRes] = await Promise.all([
-        supabase.from('students').select('id', { count: 'exact', head: true }),
-        supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase
-          .from('attendance')
-          .select('id, student_id, date, status, notes, students!attendance_student_id_fkey(class, users!students_id_fkey(fullname))')
-          .eq('date', today)
-          .neq('status', 'present')
-          .limit(10),
-      ]);
-
-      setTotalStudents(studentsRes.count ?? 0);
-      setPendingApprovals(pendingRes.count ?? 0);
-
-      if (attendanceRes.data) {
-        setAbsences(attendanceRes.data.map((r: unknown) => {
-          const row = r as Record<string, unknown>;
-          const stu = row.students as Record<string, unknown> | null;
-          return {
-            id: row.id as string,
-            student_id: row.student_id as string,
-            date: row.date as string,
-            status: row.status as string,
-            notes: row.notes as string | null,
-            student: stu
-              ? { fullname: (stu.users as Record<string, string> | null)?.fullname ?? '', class: stu.class as string ?? '' }
-              : null,
-          };
-        }));
-      }
-
-      const { count: presentCount } = await supabase
+    const [studentsRes, pendingRes, attendanceRes, presentRes] = await Promise.all([
+      supabase.from('students').select('id', { count: 'exact', head: true }),
+      supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase
+        .from('attendance')
+        .select('id, student_id, date, status, notes, time_in, time_out, students!attendance_student_id_fkey(class, users!students_id_fkey(fullname))')
+        .eq('date', today)
+        .order('time_in', { ascending: false, nullsFirst: false })
+        .limit(20),
+      supabase
         .from('attendance')
         .select('id', { count: 'exact', head: true })
         .eq('date', today)
-        .eq('status', 'present');
-      const total = studentsRes.count ?? 1;
-      setAttendanceRate(total > 0 ? Math.round(((presentCount ?? 0) / total) * 100) : 0);
-      setLoading(false);
+        .eq('status', 'present'),
+    ]);
+
+    setTotalStudents(studentsRes.count ?? 0);
+    setPendingApprovals(pendingRes.count ?? 0);
+
+    if (attendanceRes.data) {
+      setTodayAttendance(attendanceRes.data.map((r: unknown) => {
+        const row = r as Record<string, unknown>;
+        const stu = row.students as Record<string, unknown> | null;
+        return {
+          id: row.id as string,
+          student_id: row.student_id as string,
+          date: row.date as string,
+          status: row.status as string,
+          notes: row.notes as string | null,
+          time_in: row.time_in as string | null,
+          time_out: row.time_out as string | null,
+          student: stu
+            ? { fullname: (stu.users as Record<string, string> | null)?.fullname ?? '', class: stu.class as string ?? '' }
+            : null,
+        };
+      }));
     }
-    load();
+
+    const total = studentsRes.count ?? 1;
+    setAttendanceRate(total > 0 ? Math.round(((presentRes.count ?? 0) / total) * 100) : 0);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    loadAttendance();
+
+    const channel = supabase
+      .channel('admin-dashboard-attendance')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'attendance' },
+        () => {
+          setLiveTick(true);
+          loadAttendance();
+          window.setTimeout(() => setLiveTick(false), 1500);
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leave_requests' },
+        () => loadAttendance(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadAttendance]);
 
   // Fetch grades summary separately
   useEffect(() => {
@@ -139,6 +167,7 @@ export default function DashboardPage() {
   }, []);
 
   const statusLabel = (status: string) => {
+    if (status === 'present') return { label: 'Hadir', bg: '#d8f5f3', color: '#007169' };
     if (status === 'sick') return { label: 'Sakit', bg: '#ffdf9e', color: '#5b4300' };
     if (status === 'leave') return { label: 'Izin', bg: '#d8f5f3', color: '#00504a' };
     if (status === 'late') return { label: 'Terlambat', bg: '#d6e3ff', color: '#264778' };
@@ -185,26 +214,40 @@ export default function DashboardPage() {
 
       <div className="bg-white rounded-xl border border-[#e0e3e5] overflow-hidden">
         <div className="flex items-center justify-between px-4 md:px-5 py-4 border-b border-[#e0e3e5]">
-          <h2 className="font-semibold text-sm" style={{ color: '#191c1e' }}>Absence Monitoring (Today)</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-sm" style={{ color: '#191c1e' }}>Kehadiran Hari Ini</h2>
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors"
+              style={{
+                backgroundColor: liveTick ? '#d8f5f3' : '#f0f3f6',
+                color: liveTick ? '#007169' : '#43474f',
+              }}
+              title="Realtime aktif"
+            >
+              <Radio size={10} className={liveTick ? 'animate-pulse' : ''} />
+              {liveTick ? 'Update baru' : 'Live'}
+            </span>
+          </div>
           <Link href="/attendance" className="text-xs font-medium" style={{ color: '#405f91' }}>View All</Link>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[500px]">
+          <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr style={{ backgroundColor: '#f7f9fb' }}>
-                {['Student', 'Class', 'Status', 'Notes'].map((h) => (
+                {['Siswa', 'Kelas', 'Status', 'Masuk', 'Pulang'].map((h) => (
                   <th key={h} className="px-4 md:px-5 py-3 text-left text-xs font-semibold whitespace-nowrap" style={{ color: '#43474f' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} className="px-4 md:px-5 py-8 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
-              ) : absences.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 md:px-5 py-8 text-center text-sm" style={{ color: '#747780' }}>Semua siswa hadir hari ini</td></tr>
+                <tr><td colSpan={5} className="px-4 md:px-5 py-8 text-center text-sm" style={{ color: '#747780' }}>Memuat data...</td></tr>
+              ) : todayAttendance.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 md:px-5 py-8 text-center text-sm" style={{ color: '#747780' }}>Belum ada siswa absen hari ini</td></tr>
               ) : (
-                absences.map((row) => {
+                todayAttendance.map((row) => {
                   const s = statusLabel(row.status);
+                  const fmt = (t: string | null) => (t && t.length >= 5 ? t.substring(0, 5) : '—');
                   return (
                     <tr key={row.id} className="border-t border-[#f2f4f6] hover:bg-[#f7f9fb]">
                       <td className="px-4 md:px-5 py-3 font-medium whitespace-nowrap" style={{ color: '#191c1e' }}>{row.student?.fullname ?? row.student_id}</td>
@@ -212,7 +255,8 @@ export default function DashboardPage() {
                       <td className="px-4 md:px-5 py-3">
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: s.bg, color: s.color }}>{s.label}</span>
                       </td>
-                      <td className="px-4 md:px-5 py-3 max-w-[200px] truncate" style={{ color: '#43474f' }}>{row.notes ?? '—'}</td>
+                      <td className="px-4 md:px-5 py-3 whitespace-nowrap tabular-nums" style={{ color: '#43474f' }}>{fmt(row.time_in)}</td>
+                      <td className="px-4 md:px-5 py-3 whitespace-nowrap tabular-nums" style={{ color: '#43474f' }}>{fmt(row.time_out)}</td>
                     </tr>
                   );
                 })

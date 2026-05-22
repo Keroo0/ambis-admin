@@ -31,6 +31,19 @@ export default function AttendancePage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
     load();
+
+    const channel = supabase
+      .channel('admin-leave-requests')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leave_requests' },
+        () => load(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   async function load() {
