@@ -1,11 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  const isLoginPage = pathname === '/login';
+
+  // Hanya admin yang sudah login boleh mengakses halaman internal.
+  useEffect(() => {
+    if (isLoginPage) {
+      setAuthChecked(true);
+      return;
+    }
+
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (!data.session) {
+        router.replace('/login');
+      } else {
+        setAuthChecked(true);
+      }
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session && !isLoginPage) router.replace('/login');
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [isLoginPage, router]);
+
+  // Halaman login tampil penuh tanpa sidebar/header.
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  // Tahan render sampai sesi terverifikasi (mencegah konten bocor sekejap).
+  if (!authChecked) {
+    return null;
+  }
 
   return (
     <>
