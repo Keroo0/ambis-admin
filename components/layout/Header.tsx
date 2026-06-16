@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { Bell, Settings, Menu } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
+import SettingsMenu from './SettingsMenu';
 
 export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
@@ -25,15 +25,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         <button style={{ color: '#43474f' }} className="p-1.5 rounded-lg hover:bg-[#f2f4f6] transition-colors">
           <Bell size={18} />
         </button>
-        <Link
-          href="/settings"
-          aria-label="Pengaturan"
-          title="Pengaturan"
-          style={{ color: '#43474f' }}
-          className="p-1.5 rounded-lg hover:bg-[#f2f4f6] transition-colors"
-        >
-          <Settings size={18} />
-        </Link>
+        <SettingsMenu />
         <div
           style={{ backgroundColor: '#264778' }}
           className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs cursor-pointer"
