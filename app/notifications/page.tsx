@@ -14,9 +14,9 @@ interface StudentOption {
 }
 
 const TARGET_OPTIONS: { value: Target; label: string; icon: React.ElementType }[] = [
-  { value: 'all',     label: 'Semua Siswa',    icon: Users  },
-  { value: 'class',   label: 'Per Kelas',      icon: School },
-  { value: 'student', label: 'Siswa Tertentu', icon: User   },
+  { value: 'all',     label: 'Semua Siswa & Ortu',    icon: Users  },
+  { value: 'class',   label: 'Per Kelas',              icon: School },
+  { value: 'student', label: 'Siswa & Ortu Tertentu',  icon: User   },
 ];
 
 export default function NotificationsPage() {
@@ -78,7 +78,7 @@ export default function NotificationsPage() {
     if (!res.ok) {
       setResult({ ok: false, msg: json.error ?? 'Gagal mengirim notifikasi' });
     } else {
-      setResult({ ok: true, msg: `Notifikasi berhasil dikirim ke ${json.sent} siswa` });
+      setResult({ ok: true, msg: `Notifikasi berhasil dikirim ke ${json.sent} pengguna` });
       setTitle('');
       setBody('');
     }
@@ -98,7 +98,7 @@ export default function NotificationsPage() {
           Kirim Notifikasi
         </h1>
         <p className="text-xs md:text-sm mt-1" style={{ color: '#43474f' }}>
-          Tulis dan kirim pengumuman langsung ke aplikasi siswa.
+          Tulis dan kirim pengumuman langsung ke aplikasi siswa dan orang tua.
         </p>
       </div>
 
