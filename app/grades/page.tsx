@@ -122,7 +122,7 @@ export default function GradesPage() {
     setLoading(false);
   }, [selectedStudent, semester, year]);
 
-  useEffect(() => { loadGrades(); }, [loadGrades]);
+  useEffect(() => { queueMicrotask(() => loadGrades()); }, [loadGrades]);
 
   function handleChange(subj: string, field: 'uts' | 'uas', value: string) {
     if (value !== '' && (isNaN(Number(value)) || Number(value) < 0 || Number(value) > 100)) return;
@@ -189,7 +189,7 @@ export default function GradesPage() {
           created_at: Date.now(),
         }));
         await supabase.from('audit_log').insert(auditRows);
-      } catch (_) { /* non-blocking */ }
+      } catch { /* non-blocking */ }
     }
 
     await loadGrades();

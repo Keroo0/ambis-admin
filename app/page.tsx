@@ -89,7 +89,7 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    loadAttendance();
+    queueMicrotask(() => loadAttendance());
 
     const channel = supabase
       .channel('admin-dashboard-attendance')

@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
         new_value: JSON.stringify({ linked_student_id: userId, fullname: body.parent.fullname }),
         created_at: now,
       });
-    } catch (_) { /* non-blocking */ }
+    } catch { /* non-blocking */ }
   }
 
   return NextResponse.json({ id: userId }, { status: 201 });

@@ -17,7 +17,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Hanya admin yang sudah login boleh mengakses halaman internal.
   useEffect(() => {
     if (isLoginPage) {
-      setAuthChecked(true);
+      queueMicrotask(() => setAuthChecked(true));
       return;
     }
 

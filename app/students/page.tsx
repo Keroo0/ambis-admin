@@ -125,7 +125,7 @@ export default function StudentsPage() {
     setLoading(false);
   }, [page, search, classFilter, statusFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { queueMicrotask(() => load()); }, [load]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 

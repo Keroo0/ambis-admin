@@ -73,7 +73,7 @@ export default function AuditPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { queueMicrotask(() => load()); }, []);
 
   return (
     <div>

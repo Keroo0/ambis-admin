@@ -9,7 +9,7 @@ import {
   CalendarCheck,
   ClipboardList,
   Megaphone,
-  FlaskConical,
+  Gauge,
   HelpCircle,
   LogOut,
   X,
@@ -23,7 +23,7 @@ const navItems = [
   { href: '/attendance',    label: 'Attendance',    icon: CalendarCheck },
   { href: '/notifications', label: 'Notifications', icon: Megaphone     },
   { href: '/audit',         label: 'Audit Log',     icon: ClipboardList },
-  { href: '/demo', label: 'Demo Data', icon: FlaskConical },
+  { href: '/accuracy',      label: 'Accuracy',      icon: Gauge },
 ];
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
