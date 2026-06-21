@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle, AlertTriangle, Clock, Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -17,6 +17,46 @@ interface LeaveRequest {
   student?: { fullname: string; class: string } | null;
 }
 
+const LEAVE_DOCUMENTS_BUCKET = 'leave-documents';
+
+function extractAttachmentPath(value: string) {
+  const withoutQuery = value.split('?')[0];
+  const markers = [
+    `/storage/v1/object/public/${LEAVE_DOCUMENTS_BUCKET}/`,
+    `/storage/v1/object/sign/${LEAVE_DOCUMENTS_BUCKET}/`,
+  ];
+
+  for (const marker of markers) {
+    const markerIndex = withoutQuery.indexOf(marker);
+    if (markerIndex >= 0) {
+      return decodeURIComponent(withoutQuery.slice(markerIndex + marker.length));
+    }
+  }
+
+  if (!/^https?:\/\//i.test(value)) {
+    return value.replace(new RegExp(`^${LEAVE_DOCUMENTS_BUCKET}/`), '');
+  }
+
+  return null;
+}
+
+async function resolveAttachmentUrl(value: string | null) {
+  if (!value) return null;
+
+  const storagePath = extractAttachmentPath(value);
+  if (!storagePath) return value;
+
+  const { data, error } = await supabase.storage
+    .from(LEAVE_DOCUMENTS_BUCKET)
+    .createSignedUrl(storagePath, 60 * 60);
+
+  return error ? value : data.signedUrl;
+}
+
+function currentTimestamp() {
+  return Date.now();
+}
+
 export default function AttendancePage() {
   const [pending, setPending] = useState<LeaveRequest[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
@@ -28,25 +68,7 @@ export default function AttendancePage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [adminId, setAdminId] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
-    load();
-
-    const channel = supabase
-      .channel('admin-leave-requests')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'leave_requests' },
-        () => load(),
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const today = new Date().toISOString().split('T')[0];
 
@@ -70,14 +92,14 @@ export default function AttendancePage() {
     ]);
 
     if (pendingRes.data) {
-      const rows = pendingRes.data.map((r: Record<string, unknown>) => {
+      const rows = await Promise.all(pendingRes.data.map(async (r: Record<string, unknown>) => {
         const stu = r.students as Record<string, unknown> | null;
         return {
           id: r.id as string,
           student_id: r.student_id as string,
           type: r.type as string,
           reason: r.reason as string | null,
-          attachment_url: r.attachment_url as string | null,
+          attachment_url: await resolveAttachmentUrl(r.attachment_url as string | null),
           status: r.status as string,
           date_from: r.date_from as string | null,
           date_to: r.date_to as string | null,
@@ -86,21 +108,40 @@ export default function AttendancePage() {
             ? { fullname: (stu.users as Record<string, string> | null)?.fullname ?? '-', class: stu.class as string ?? '-' }
             : null,
         };
-      });
+      }));
       setPending(rows);
       setPendingCount(rows.length);
     }
     setApprovedToday(approvedRes.count ?? 0);
     setAttentionNeeded(rejectedRes.count ?? 0);
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
+    queueMicrotask(() => load());
+
+    const channel = supabase
+      .channel('admin-leave-requests')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leave_requests' },
+        () => load(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [load]);
 
   async function handleApprove(id: string) {
     setActionLoading(id);
     const req = pending.find((r) => r.id === id);
+    const reviewedAt = currentTimestamp();
     const { error: updateErr } = await supabase
       .from('leave_requests')
-      .update({ status: 'approved', reviewed_at: Date.now() })
+      .update({ status: 'approved', reviewed_at: reviewedAt })
       .eq('id', id);
     if (updateErr) {
       setActionLoading(null);
@@ -118,20 +159,21 @@ export default function AttendancePage() {
         entity_id: id,
         old_value: { status: 'pending' },
         new_value: { status: 'approved', student_id: req?.student_id },
-        created_at: Date.now(),
+        created_at: reviewedAt,
       });
-    } catch (_) { /* non-blocking */ }
+    } catch { /* non-blocking */ }
   }
 
   async function handleReject(id: string, reason: string) {
     setActionLoading(id);
     const req = pending.find((r) => r.id === id);
+    const reviewedAt = currentTimestamp();
     await supabase
       .from('leave_requests')
       .update({
         status: 'rejected',
         rejected_reason: reason.trim() || null,
-        reviewed_at: Date.now(),
+        reviewed_at: reviewedAt,
       })
       .eq('id', id);
     setPending((prev) => prev.filter((r) => r.id !== id));
@@ -148,9 +190,9 @@ export default function AttendancePage() {
         entity_id: id,
         old_value: { status: 'pending' },
         new_value: { status: 'rejected', rejected_reason: reason.trim() || null, student_id: req?.student_id },
-        created_at: Date.now(),
+        created_at: reviewedAt,
       });
-    } catch (_) { /* non-blocking */ }
+    } catch { /* non-blocking */ }
   }
 
   const typeLabel = (type: string) =>
